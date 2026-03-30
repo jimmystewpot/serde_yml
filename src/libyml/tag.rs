@@ -1,5 +1,3 @@
-use crate::libyml::safe_cstr;
-use memchr::memchr;
 use std::{
     fmt::{self, Debug, Display},
     ops::Deref,
@@ -10,15 +8,6 @@ use std::{
 pub struct TagFormatError;
 
 impl Display for TagFormatError {
-    /// Formats the error message for display.
-    ///
-    /// # Arguments
-    ///
-    /// * `f` - The formatter to write the error message to.
-    ///
-    /// # Returns
-    ///
-    /// Returns `fmt::Result` indicating the success or failure of the operation.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Error occurred while formatting tag")
     }
@@ -29,7 +18,7 @@ impl std::error::Error for TagFormatError {}
 /// Represents a tag in a YAML document.
 /// A tag specifies the data type or semantic meaning of a value.
 #[derive(Ord, PartialOrd, Eq, PartialEq, Clone, Hash)]
-pub struct Tag(pub(in crate::libyml) Box<[u8]>);
+pub struct Tag(pub(crate) Box<[u8]>);
 
 impl Tag {
     /// The null tag, representing a null value.
@@ -45,19 +34,6 @@ impl Tag {
     pub const FLOAT: &'static str = "tag:yaml.org,2002:float";
 
     /// Checks if the tag starts with the given prefix.
-    ///
-    /// # Arguments
-    ///
-    /// * `prefix` - The prefix to check against.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(true)` if the tag starts with the given prefix, `Ok(false)` otherwise.
-    /// Returns an error if the prefix is longer than the tag.
-    ///
-    /// # Errors
-    ///
-    /// Returns `TagFormatError` if the prefix length is greater than the tag length.
     pub fn starts_with(
         &self,
         prefix: &str,
@@ -72,77 +48,53 @@ impl Tag {
     }
 
     /// Creates a new `Tag` instance from a `&str` input.
-    ///
-    /// # Arguments
-    ///
-    /// * `tag_str` - The string representing the tag.
-    ///
-    /// # Returns
-    ///
-    /// Returns a `Tag` instance representing the specified tag string.
     pub fn new(tag_str: &str) -> Tag {
         Tag(Box::from(tag_str.as_bytes()))
     }
 }
 
 impl PartialEq<str> for Tag {
-    /// Checks if the tag is equal to the given string.
-    ///
-    /// # Arguments
-    ///
-    /// * `other` - The string to compare against.
-    ///
-    /// # Returns
-    ///
-    /// Returns `true` if the tag is equal to the given string, `false` otherwise.
     fn eq(&self, other: &str) -> bool {
-        self.0 == other.as_bytes().into()
+        self.0.as_ref() == other.as_bytes()
     }
 }
 
 impl PartialEq<&str> for Tag {
-    /// Checks if the tag is equal to the given string slice.
-    ///
-    /// # Arguments
-    ///
-    /// * `other` - The string slice to compare against.
-    ///
-    /// # Returns
-    ///
-    /// Returns `true` if the tag is equal to the given string slice, `false` otherwise.
     fn eq(&self, other: &&str) -> bool {
-        self.0 == other.as_bytes().into()
+        self.0.as_ref() == other.as_bytes()
     }
 }
 
 impl Deref for Tag {
     type Target = [u8];
 
-    /// Dereferences the tag to its underlying byte slice.
-    ///
-    /// # Returns
-    ///
-    /// Returns a reference to the underlying byte slice of the tag.
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
 impl Debug for Tag {
-    /// Formats the tag for debugging purposes.
-    ///
-    /// # Arguments
-    ///
-    /// * `formatter` - The formatter to write the debug output to.
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` if the formatting was successful, or an error otherwise.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(null_pos) = memchr(b'\0', &self.0) {
-            safe_cstr::debug_lossy(&self.0[..null_pos], formatter)
-        } else {
-            safe_cstr::debug_lossy(&self.0, formatter)
-        }
+        let s = String::from_utf8_lossy(&self.0);
+        Debug::fmt(&s, formatter)
+    }
+}
+
+impl Display for Tag {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = String::from_utf8_lossy(&self.0);
+        Display::fmt(&s, f)
+    }
+}
+
+impl From<String> for Tag {
+    fn from(s: String) -> Self {
+        Tag(Box::from(s.into_bytes()))
+    }
+}
+
+impl From<&str> for Tag {
+    fn from(s: &str) -> Self {
+        Tag(Box::from(s.as_bytes()))
     }
 }

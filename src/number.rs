@@ -1,6 +1,6 @@
 use crate::{
     de,
-    modules::error::{self, Error, ErrorImpl},
+    modules::error::{Error, ErrorImpl},
 };
 use serde::{
     de::{Unexpected, Visitor},
@@ -169,7 +169,7 @@ impl FromStr for Number {
                 return Ok(float.into());
             }
         }
-        Err(error::new(ErrorImpl::FailedToParseNumber))
+        Err(Error::new(ErrorImpl::FailedToParseNumber))
     }
 }
 

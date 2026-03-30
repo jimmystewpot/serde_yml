@@ -1,3 +1,4 @@
+//! Test suite for the serde_yml crate.
 /// The `test_de` module contains tests for the `Deserialize` trait implementations.
 pub mod test_de;
 

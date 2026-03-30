@@ -92,12 +92,35 @@ impl<'input> Loader<'input> {
             Progress::Str(s) => Cow::Borrowed(s.as_bytes()),
             Progress::Slice(bytes) => Cow::Borrowed(bytes),
             Progress::Read(mut rdr) => {
+                const MAX_ALLOC: usize = 128 * 1024 * 1024; // 128 MB
                 let mut buffer = Vec::new();
-                if let Err(io_error) = rdr.read_to_end(&mut buffer) {
+                if let Err(io_error) =
+                    rdr.by_ref().take(MAX_ALLOC as u64).read_to_end(&mut buffer)
+                {
                     return Err(error::new(ErrorImpl::IoError(
                         io_error,
                     )));
                 }
+                if rdr.read(&mut [0u8; 1]).is_ok() && !buffer.is_empty() {
+                     // If we can still read more, it means we hit the limit
+                     // This is a bit of a hack to detect if there's more data.
+                     // A better way would be to check the length of the buffer.
+                }
+                // Check if we might have more data
+                let mut probe = [0u8; 1];
+                match rdr.read(&mut probe) {
+                    Ok(0) => {} // EOF reached
+                    Ok(_) => {
+                        return Err(error::new(ErrorImpl::IoError(
+                            std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                "input too large (max 128MB)",
+                            ),
+                        )));
+                    }
+                    Err(e) => return Err(error::new(ErrorImpl::IoError(e))),
+                }
+
                 Cow::Owned(buffer)
             }
             Progress::Iterable(_) | Progress::Document(_) => {

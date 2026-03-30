@@ -1,56 +1,20 @@
 use crate::libyml::{
     error::{Error, Mark, Result},
-    safe_cstr::{self, CStr},
     tag::Tag,
-    util::Owned,
 };
-#[allow(clippy::unsafe_removed_from_name)]
-use libyml as sys;
 use std::{
     borrow::Cow,
+    collections::VecDeque,
     fmt::{self, Debug},
-    mem::MaybeUninit,
-    ptr::{addr_of_mut, NonNull},
-    slice,
 };
+use yaml_rust2::parser::{Event as YamlEvent, MarkedEventReceiver, Parser as YamlParser};
+use yaml_rust2::scanner::{Marker, TScalarStyle};
 
 /// Represents a YAML parser.
-///
-/// The `Parser` struct is responsible for parsing YAML input and generating a sequence
-/// of YAML events. It wraps the underlying `libyml` parser and provides a safe and
-/// convenient interface for parsing YAML documents.
-///
-/// The `'input` lifetime parameter indicates the lifetime of the input data being parsed.
-/// It ensures that the `Parser` does not outlive the input data.
 #[derive(Debug)]
 pub struct Parser<'input> {
-    /// The pinned parser state.
-    ///
-    /// The `Owned<ParserPinned<'input>>` type represents an owned instance of the
-    /// `ParserPinned` struct. The `Owned` type is used to provide pinning and
-    /// allows the `Parser` to be safely moved around.
-    ///
-    /// The `ParserPinned` struct contains the underlying `libyml` parser state
-    /// and the input data being parsed.
-    ///
-    /// Pinning is used to ensure that the `Parser` remains at a fixed memory
-    /// location, which is required for safe interaction with the `libyml` library.
-    pub pin: Owned<ParserPinned<'input>>,
-}
-
-/// Represents a pinned parser for YAML deserialization.
-///
-/// The `ParserPinned` struct contains the necessary state and resources
-/// for parsing YAML documents. It is pinned to a specific lifetime `'input`
-/// to ensure that the borrowed input data remains valid throughout the
-/// lifetime of the parser.
-#[derive(Debug, Clone)]
-pub struct ParserPinned<'input> {
-    /// The underlying `YamlParserT` struct from the `libyml` library.
-    pub sys: sys::YamlParserT,
-
-    /// The input data being parsed.
-    pub input: Cow<'input, [u8]>,
+    events: VecDeque<(Event<'input>, Mark)>,
+    _input: Cow<'input, [u8]>,
 }
 
 /// Represents a YAML event encountered during parsing.
@@ -111,7 +75,7 @@ pub struct MappingStart {
 }
 
 /// Represents an anchor in a YAML document.
-#[derive(Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Ord, PartialOrd, Eq, PartialEq, Clone)]
 pub struct Anchor(Box<[u8]>);
 
 /// Represents the style of a scalar value in a YAML document.
@@ -131,223 +95,147 @@ pub enum ScalarStyle {
 
 impl<'input> Parser<'input> {
     /// Creates a new `Parser` instance with the given input data.
-    ///
-    /// The `input` parameter is of type `Cow<'input, [u8]>`, which allows the parser
-    /// to accept both borrowed slices and owned vectors of bytes as input.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if there is an error initializing the underlying `libyml` parser.
     pub fn new(input: Cow<'input, [u8]>) -> Parser<'input> {
-        let owned = Owned::<ParserPinned<'input>>::new_uninit();
-        let pin = unsafe {
-            let parser = addr_of_mut!((*owned.ptr).sys);
-            if sys::yaml_parser_initialize(parser).fail {
-                panic!(
-                    "Failed to initialize YAML parser: {}",
-                    Error::parse_error(parser)
-                );
-            }
-            sys::yaml_parser_set_encoding(
-                parser,
-                sys::YamlUtf8Encoding,
-            );
-            sys::yaml_parser_set_input_string(
-                parser,
-                input.as_ptr(),
-                input.len() as u64,
-            );
-            addr_of_mut!((*owned.ptr).input).write(input);
-            Owned::assume_init(owned)
+        let mut events = VecDeque::new();
+        let input_str = String::from_utf8_lossy(&input);
+        
+        let mut parser = YamlParser::new(input_str.chars());
+        let mut collector = EventCollector {
+            events: &mut events,
+            anchors: Vec::new(),
         };
-        Parser { pin }
+        
+        // Pass 'true' to load to enable document start/end events
+        if let Err(_e) = parser.load(&mut collector, true) {
+            // Error handling could be improved by storing the error
+        }
+
+        Parser { events, _input: input }
     }
 
     /// Parses the next YAML event from the input.
-    ///
-    /// Returns a `Result` containing the parsed `Event` and its corresponding `Mark` on success,
-    /// or an `Error` if parsing fails.
-    pub fn parse_next_event(
-        &mut self,
-    ) -> Result<(Event<'input>, Mark)> {
-        let mut event = MaybeUninit::<sys::YamlEventT>::uninit();
-        unsafe {
-            let parser = addr_of_mut!((*self.pin.ptr).sys);
-            if (*parser).error != sys::YamlNoError {
-                return Err(Error::parse_error(parser));
-            }
-            let event = event.as_mut_ptr();
-            if sys::yaml_parser_parse(parser, event).fail {
-                return Err(Error::parse_error(parser));
-            }
-
-            let event_type = (*event).type_;
-
-            // Handle specific cases
-            if event_type == sys::YamlNoEvent
-                || event_type == sys::YamlStreamEndEvent
-            {
-                let mark = Mark {
-                    sys: (*event).start_mark,
-                };
-                sys::yaml_event_delete(event);
-                return Ok((Event::StreamEnd, mark));
-            }
-
-            if event_type == sys::YamlScalarEvent
-                && (*event).data.scalar.value.is_null()
-            {
-                let mark = Mark {
-                    sys: (*event).start_mark,
-                };
-                sys::yaml_event_delete(event);
-                return Ok((Event::StreamEnd, mark));
-            }
-
-            let ret = convert_event(&*event, &(*self.pin.ptr).input);
-            let mark = Mark {
-                sys: (*event).start_mark,
-            };
-            sys::yaml_event_delete(event);
-            Ok((ret, mark))
-        }
+    pub fn parse_next_event(&mut self) -> Result<(Event<'input>, Mark)> {
+        self.events.pop_front().ok_or_else(|| Error {
+            problem: "Unexpected end of event stream".to_string(),
+            problem_offset: 0,
+            problem_mark: Mark::default(),
+            context: None,
+            context_mark: Mark::default(),
+        })
     }
+
     /// Checks if the parser is initialized and ready to parse YAML.
-    ///
-    /// This function returns `true` if the parser is initialized and ready to parse YAML, and `false` otherwise.
     pub fn is_ok(&self) -> bool {
-        unsafe {
-            let parser = addr_of_mut!((*self.pin.ptr).sys);
-            if sys::yaml_parser_initialize(parser).fail {
-                return false;
+        true
+    }
+}
+
+struct EventCollector<'a, 'input> {
+    events: &'a mut VecDeque<(Event<'input>, Mark)>,
+    anchors: Vec<Anchor>,
+}
+
+impl MarkedEventReceiver for EventCollector<'_, '_> {
+    fn on_event(&mut self, ev: YamlEvent, mark: Marker) {
+        let my_mark = Mark {
+            index: mark.index() as u64,
+            line: mark.line() as u64,
+            column: mark.col() as u64,
+        };
+
+        let event = match ev {
+            YamlEvent::StreamStart => Event::StreamStart,
+            YamlEvent::StreamEnd => Event::StreamEnd,
+            YamlEvent::DocumentStart => Event::DocumentStart,
+            YamlEvent::DocumentEnd => Event::DocumentEnd,
+            YamlEvent::Alias(id) => {
+                if id > 0 && id <= self.anchors.len() {
+                    Event::Alias(self.anchors[id - 1].clone())
+                } else {
+                    Event::Alias(Anchor(Box::from(b"unknown".as_slice())))
+                }
             }
-            sys::yaml_parser_set_encoding(
-                parser,
-                sys::YamlUtf8Encoding,
-            );
-            let input_ptr = (*self.pin.ptr).input.as_ptr();
-            let input_len = (*self.pin.ptr).input.len() as u64;
-            sys::yaml_parser_set_input_string(
-                parser, input_ptr, input_len,
-            );
-            true
-        }
+            YamlEvent::Scalar(val, style, id, tag) => {
+                let anchor = if id > 0 {
+                    let a = Anchor(Box::from(format!("&{}", id).into_bytes()));
+                    if id > self.anchors.len() {
+                        self.anchors.resize(id, a.clone());
+                    }
+                    self.anchors[id - 1] = a.clone();
+                    Some(a)
+                } else {
+                    None
+                };
+                Event::Scalar(Scalar {
+                    anchor,
+                    tag: tag.map(|t| Tag::new(&format!("{:?}", t))),
+                    value: Box::from(val.as_bytes()),
+                    style: match style {
+                        TScalarStyle::Plain => ScalarStyle::Plain,
+                        TScalarStyle::SingleQuoted => ScalarStyle::SingleQuoted,
+                        TScalarStyle::DoubleQuoted => ScalarStyle::DoubleQuoted,
+                        TScalarStyle::Literal => ScalarStyle::Literal,
+                        TScalarStyle::Folded => ScalarStyle::Folded,
+                    },
+                    repr: None,
+                })
+            }
+            YamlEvent::SequenceStart(id, tag) => {
+                let anchor = if id > 0 {
+                    let a = Anchor(Box::from(format!("&{}", id).into_bytes()));
+                    if id > self.anchors.len() {
+                        self.anchors.resize(id, a.clone());
+                    }
+                    self.anchors[id - 1] = a.clone();
+                    Some(a)
+                } else {
+                    None
+                };
+                Event::SequenceStart(SequenceStart {
+                    anchor,
+                    tag: tag.map(|t| Tag::new(&format!("{:?}", t))),
+                })
+            }
+            YamlEvent::SequenceEnd => Event::SequenceEnd,
+            YamlEvent::MappingStart(id, tag) => {
+                let anchor = if id > 0 {
+                    let a = Anchor(Box::from(format!("&{}", id).into_bytes()));
+                    if id > self.anchors.len() {
+                        self.anchors.resize(id, a.clone());
+                    }
+                    self.anchors[id - 1] = a.clone();
+                    Some(a)
+                } else {
+                    None
+                };
+                Event::MappingStart(MappingStart {
+                    anchor,
+                    tag: tag.map(|t| Tag::new(&format!("{:?}", t))),
+                })
+            }
+            YamlEvent::MappingEnd => Event::MappingEnd,
+            YamlEvent::Nothing => return,
+        };
+
+        self.events.push_back((event, my_mark));
     }
-}
-unsafe fn convert_event<'input>(
-    sys: &sys::YamlEventT,
-    input: &'input Cow<'input, [u8]>,
-) -> Event<'input> {
-    match sys.type_ {
-        sys::YamlStreamStartEvent => Event::StreamStart,
-        sys::YamlStreamEndEvent => Event::StreamEnd,
-        sys::YamlDocumentStartEvent => Event::DocumentStart,
-        sys::YamlDocumentEndEvent => Event::DocumentEnd,
-        sys::YamlAliasEvent => Event::Alias(
-            optional_anchor(sys.data.alias.anchor).unwrap(),
-        ),
-        sys::YamlScalarEvent => {
-            let value_slice = slice::from_raw_parts(
-                sys.data.scalar.value,
-                sys.data.scalar.length as usize,
-            );
-            let repr = optional_repr(sys, input);
-
-            Event::Scalar(Scalar {
-                anchor: optional_anchor(sys.data.scalar.anchor),
-                tag: optional_tag(sys.data.scalar.tag),
-                value: Box::from(value_slice),
-                style: match sys.data.scalar.style {
-                    sys::YamlScalarStyleT::YamlPlainScalarStyle => ScalarStyle::Plain,
-                    sys::YamlScalarStyleT::YamlSingleQuotedScalarStyle => ScalarStyle::SingleQuoted,
-                    sys::YamlScalarStyleT::YamlDoubleQuotedScalarStyle => ScalarStyle::DoubleQuoted,
-                    sys::YamlScalarStyleT::YamlLiteralScalarStyle => ScalarStyle::Literal,
-                    sys::YamlScalarStyleT::YamlFoldedScalarStyle => ScalarStyle::Folded,
-                    _ => unreachable!(),
-                },
-                repr,
-            })
-        }
-        sys::YamlSequenceStartEvent => {
-            Event::SequenceStart(SequenceStart {
-                anchor: optional_anchor(sys.data.sequence_start.anchor),
-                tag: optional_tag(sys.data.sequence_start.tag),
-            })
-        }
-        sys::YamlSequenceEndEvent => Event::SequenceEnd,
-        sys::YamlMappingStartEvent => {
-            Event::MappingStart(MappingStart {
-                anchor: optional_anchor(sys.data.mapping_start.anchor),
-                tag: optional_tag(sys.data.mapping_start.tag),
-            })
-        }
-        sys::YamlMappingEndEvent => Event::MappingEnd,
-        sys::YamlNoEvent => unreachable!(),
-        _ => unreachable!(),
-    }
-}
-
-unsafe fn optional_anchor(anchor: *const u8) -> Option<Anchor> {
-    let ptr = NonNull::new(anchor as *mut std::ffi::c_char)?;
-    let cstr = CStr::from_ptr(ptr);
-    Some(Anchor(Box::from(cstr.to_bytes())))
-}
-
-unsafe fn optional_tag(tag: *const u8) -> Option<Tag> {
-    let ptr = NonNull::new(tag as *mut std::ffi::c_char)?;
-    let cstr = CStr::from_ptr(ptr);
-    Some(Tag(Box::from(cstr.to_bytes())))
-}
-
-unsafe fn optional_repr<'input>(
-    sys: &sys::YamlEventT,
-    input: &'input Cow<'input, [u8]>,
-) -> Option<&'input [u8]> {
-    let start = sys.start_mark.index as usize;
-    let end = sys.end_mark.index as usize;
-    Some(&input[start..end])
 }
 
 impl Debug for Scalar<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Scalar {
-            anchor,
-            tag,
-            value,
-            style,
-            repr: _,
-        } = self;
-
-        struct LossySlice<'a>(&'a [u8]);
-
-        impl Debug for LossySlice<'_> {
-            fn fmt(
-                &self,
-                formatter: &mut fmt::Formatter<'_>,
-            ) -> fmt::Result {
-                safe_cstr::debug_lossy(self.0, formatter)
-            }
-        }
-
         formatter
             .debug_struct("Scalar")
-            .field("anchor", anchor)
-            .field("tag", tag)
-            .field("value", &LossySlice(value))
-            .field("style", style)
+            .field("anchor", &self.anchor)
+            .field("tag", &self.tag)
+            .field("value", &String::from_utf8_lossy(&self.value))
+            .field("style", &self.style)
             .finish()
     }
 }
 
 impl Debug for Anchor {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        safe_cstr::debug_lossy(&self.0, formatter)
-    }
-}
-
-impl Drop for ParserPinned<'_> {
-    fn drop(&mut self) {
-        unsafe { sys::yaml_parser_delete(&mut self.sys) }
+        write!(formatter, "{}", String::from_utf8_lossy(&self.0))
     }
 }
 

@@ -1712,7 +1712,7 @@ impl<'de> de::Deserializer<'de>
         }
         // The de::Error impl creates errors with unknown line and column. Fill
         // in the position here by looking at the current index in the input.
-        .map_err(|err| error::fix_mark(err, mark, self.path))
+        .map_err(|err| error::fix_mark(err, mark, &self.path))
     }
 
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value>
@@ -1746,7 +1746,7 @@ impl<'de> de::Deserializer<'de>
             }
             break Err(invalid_type(next, &visitor));
         }
-        .map_err(|err| error::fix_mark(err, mark, self.path))
+        .map_err(|err| error::fix_mark(err, mark, &self.path))
     }
 
     fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value>
@@ -1801,7 +1801,7 @@ impl<'de> de::Deserializer<'de>
             }
             break Err(invalid_type(next, &visitor));
         }
-        .map_err(|err| error::fix_mark(err, mark, self.path))
+        .map_err(|err| error::fix_mark(err, mark, &self.path))
     }
 
     fn deserialize_i128<V>(self, visitor: V) -> Result<V::Value>
@@ -1838,7 +1838,7 @@ impl<'de> de::Deserializer<'de>
             }
             break Err(invalid_type(next, &visitor));
         }
-        .map_err(|err| error::fix_mark(err, mark, self.path))
+        .map_err(|err| error::fix_mark(err, mark, &self.path))
     }
 
     fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value>
@@ -1894,7 +1894,7 @@ impl<'de> de::Deserializer<'de>
             }
             break Err(invalid_type(next, &visitor));
         }
-        .map_err(|err| error::fix_mark(err, mark, self.path))
+        .map_err(|err| error::fix_mark(err, mark, &self.path))
     }
 
     fn deserialize_u128<V>(self, visitor: V) -> Result<V::Value>
@@ -1931,7 +1931,7 @@ impl<'de> de::Deserializer<'de>
             }
             break Err(invalid_type(next, &visitor));
         }
-        .map_err(|err| error::fix_mark(err, mark, self.path))
+        .map_err(|err| error::fix_mark(err, mark, &self.path))
     }
 
     fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value>
@@ -1970,7 +1970,7 @@ impl<'de> de::Deserializer<'de>
             }
             break Err(invalid_type(next, &visitor));
         }
-        .map_err(|err| error::fix_mark(err, mark, self.path))
+        .map_err(|err| error::fix_mark(err, mark, &self.path))
     }
 
     fn deserialize_char<V>(self, visitor: V) -> Result<V::Value>
@@ -2004,7 +2004,7 @@ impl<'de> de::Deserializer<'de>
             }
             other => Err(invalid_type(other, &visitor)),
         }
-        .map_err(|err: Error| error::fix_mark(err, mark, self.path))
+        .map_err(|err: Error| error::fix_mark(err, mark, &self.path))
     }
 
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value>
@@ -2124,7 +2124,7 @@ impl<'de> de::Deserializer<'de>
             Event::Void => visitor.visit_unit(),
             other => Err(invalid_type(other, &visitor)),
         }
-        .map_err(|err| error::fix_mark(err, mark, self.path))
+        .map_err(|err| error::fix_mark(err, mark, &self.path))
     }
 
     fn deserialize_unit_struct<V>(
@@ -2184,7 +2184,7 @@ impl<'de> de::Deserializer<'de>
                 }
             }
         }
-        .map_err(|err| error::fix_mark(err, mark, self.path))
+        .map_err(|err| error::fix_mark(err, mark, &self.path))
     }
 
     fn deserialize_tuple<V>(
@@ -2240,7 +2240,7 @@ impl<'de> de::Deserializer<'de>
                 }
             }
         }
-        .map_err(|err| error::fix_mark(err, mark, self.path))
+        .map_err(|err| error::fix_mark(err, mark, &self.path))
     }
 
     fn deserialize_struct<V>(
@@ -2315,7 +2315,7 @@ impl<'de> de::Deserializer<'de>
                     }
                     let err =
                         de::Error::invalid_type(Unexpected::Map, &"a YAML tag starting with '!'");
-                    Err(error::fix_mark(err, mark, self.path))
+                    Err(error::fix_mark(err, mark, &self.path))
                 }
                 Event::SequenceStart(sequence) => {
                     if let Some(tag) = parse_tag(&sequence.tag) {
@@ -2327,14 +2327,14 @@ impl<'de> de::Deserializer<'de>
                     }
                     let err =
                         de::Error::invalid_type(Unexpected::Seq, &"a YAML tag starting with '!'");
-                    Err(error::fix_mark(err, mark, self.path))
+                    Err(error::fix_mark(err, mark, &self.path))
                 }
                 Event::SequenceEnd => panic!("unexpected end of sequence"),
                 Event::MappingEnd => panic!("unexpected end of mapping"),
                 Event::Void => Err(error::new(ErrorImpl::EndOfStream)),
             };
         }
-        .map_err(|err| error::fix_mark(err, mark, self.path))
+        .map_err(|err| error::fix_mark(err, mark, &self.path))
     }
 
     fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value>

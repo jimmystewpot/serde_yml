@@ -1,3 +1,4 @@
+//! Test suite for the serde_yml crate.
 #![allow(
     clippy::derive_partial_eq_without_eq,
     clippy::eq_op,

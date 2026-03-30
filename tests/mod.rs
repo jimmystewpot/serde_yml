@@ -1,3 +1,4 @@
+//! Test suite for the serde_yml crate.
 /// This module contains the tests for the `libyml` module.
 pub mod libyml;
 

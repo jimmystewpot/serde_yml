@@ -1,3 +1,4 @@
+//! Test suite for the serde_yml crate.
 #![allow(
     clippy::decimal_literal_representation,
     clippy::derive_partial_eq_without_eq,

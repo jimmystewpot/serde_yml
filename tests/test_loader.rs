@@ -1,3 +1,4 @@
+//! Test suite for the serde_yml crate.
 #[cfg(test)]
 mod tests {
     use serde_yml::{
@@ -291,13 +292,7 @@ mod tests {
     #[test]
     /// Tests for loading from a reader with an error
     fn test_loader_new_from_fail() {
-        let error = ErrorImpl::IoError(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "test error",
-        ));
-        let progress = Progress::Fail(Arc::new(ErrorImpl::Shared(
-            Arc::new(error),
-        )));
+        let progress = Progress::Fail(Arc::new(ErrorImpl::EndOfStream));
         let loader_result = Loader::new(progress);
         assert!(loader_result.is_err());
     }

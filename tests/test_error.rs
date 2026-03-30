@@ -1,3 +1,4 @@
+//! Test suite for the serde_yml crate.
 #![allow(clippy::zero_sized_map_values)]
 
 use indoc::indoc;

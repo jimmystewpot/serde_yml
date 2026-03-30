@@ -1,3 +1,4 @@
+//! Test suite for the serde_yml crate.
 #[cfg(test)]
 mod tests {
     #![allow(
