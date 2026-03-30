@@ -16,7 +16,7 @@ use std::io;
 ///
 /// fn main() -> serde_yml::Result<()> {
 ///     let mut buffer = Vec::new();
-///     let mut ser = serde_yml::Serializer::new(&mut buffer);
+///     let mut ser = serde_yml::Serializer::new(&mut buffer)?;
 ///
 ///     let mut object = BTreeMap::new();
 ///     object.insert("k", 107);
@@ -68,23 +68,31 @@ where
     W: io::Write + 'a,
 {
     /// Creates a new YAML serializer.
-    pub fn new(writer: W) -> Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the initial stream-start event cannot be written.
+    pub fn new(writer: W) -> Result<Self> {
         Self::new_with_config(writer, SerializerConfig::default())
     }
 
     /// Creates a new YAML serializer with a configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the initial stream-start event cannot be written.
     pub fn new_with_config(
         writer: W,
         config: SerializerConfig,
-    ) -> Self {
+    ) -> Result<Self> {
         let mut emitter = Emitter::new(writer);
-        emitter.emit(Event::StreamStart).unwrap();
-        Serializer {
+        emitter.emit(Event::StreamStart).map_err(Error::from)?;
+        Ok(Serializer {
             config,
             depth: 0,
             state: State::NothingInParticular,
             emitter,
-        }
+        })
     }
 
     /// Calls [`.flush()`](io::Write::flush) on the underlying `io::Write`
@@ -111,7 +119,9 @@ where
             scalar.tag = Some(tag);
         }
         self.value_start()?;
-        self.emitter.emit(Event::Scalar(scalar)).map_err(Error::from)?;
+        self.emitter
+            .emit(Event::Scalar(scalar))
+            .map_err(Error::from)?;
         self.value_end()
     }
 
@@ -175,9 +185,10 @@ where
 
     /// Takes the tag from the serializer state.
     pub fn take_tag(&mut self) -> Option<String> {
-        if let State::FoundTag(tag) =
-            std::mem::replace(&mut self.state, State::NothingInParticular)
-        {
+        if let State::FoundTag(tag) = std::mem::replace(
+            &mut self.state,
+            State::NothingInParticular,
+        ) {
             Some(tag)
         } else {
             None
@@ -353,12 +364,18 @@ where
         self.emit_mapping_end()
     }
 
-    fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq> {
+    fn serialize_seq(
+        self,
+        _len: Option<usize>,
+    ) -> Result<Self::SerializeSeq> {
         self.emit_sequence_start()?;
         Ok(self)
     }
 
-    fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple> {
+    fn serialize_tuple(
+        self,
+        _len: usize,
+    ) -> Result<Self::SerializeTuple> {
         self.serialize_seq(Some(_len))
     }
 
@@ -383,7 +400,10 @@ where
         Ok(self)
     }
 
-    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap> {
+    fn serialize_map(
+        self,
+        _len: Option<usize>,
+    ) -> Result<Self::SerializeMap> {
         self.emit_mapping_start()?;
         Ok(self)
     }
@@ -604,7 +624,7 @@ where
     W: io::Write + 'a,
     T: ?Sized + ser::Serialize,
 {
-    let mut serializer = Serializer::new(writer);
+    let mut serializer = Serializer::new(writer)?;
     value.serialize(&mut serializer)
 }
 

@@ -49,7 +49,7 @@ fn main() {
     match version_check::is_min_version(min_version) {
         Some(true) => {}
         _ => {
-            eprintln!("'fd' requires Rustc version >= {}", min_version);
+            println!("cargo:warning='fd' requires Rustc version >= {}", min_version);
             process::exit(1);
         }
     }

@@ -3,9 +3,9 @@ use crate::{
     modules::error::{Error, ErrorImpl},
 };
 use serde::{
+    Deserialize, Deserializer, Serialize, Serializer,
     de::{Unexpected, Visitor},
-    forward_to_deserialize_any, Deserialize, Deserializer, Serialize,
-    Serializer,
+    forward_to_deserialize_any,
 };
 use std::{
     cmp::Ordering,
@@ -22,7 +22,6 @@ pub struct Number {
 
 /// Enum representing different variants of numbers.
 #[derive(Copy, Clone, Debug)]
-#[repr(C)]
 enum N {
     /// Represents a positive integer.
     PositiveInteger(u64),

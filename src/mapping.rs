@@ -1,6 +1,6 @@
 //! A YAML mapping and its iterator types.
 
-use crate::{private, Value};
+use crate::{Value, private};
 use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{

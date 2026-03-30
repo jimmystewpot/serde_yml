@@ -9,8 +9,8 @@ use crate::{
     modules::path::Path,
 };
 use serde::de::{
-    self, value::StrDeserializer, Deserialize, DeserializeOwned,
-    DeserializeSeed, Expected, IgnoredAny, Unexpected, Visitor,
+    self, Deserialize, DeserializeOwned, DeserializeSeed, Expected,
+    IgnoredAny, Unexpected, Visitor, value::StrDeserializer,
 };
 use std::collections::BTreeMap;
 use std::fmt::Debug;
@@ -295,10 +295,13 @@ impl<'de> Deserializer<'de> {
 
         let mut anchors = Vec::new();
         for (alias_id, document_index) in &document.anchor_event_map {
-            let anchor_name = document.anchor_names.get(alias_id).unwrap();
+            let anchor_name =
+                document.anchor_names.get(alias_id).unwrap();
             let anchor_path = self.event_path(*document_index);
             let mut anchors_aliases = Vec::new();
-            for alias_index in aliases.get(alias_id).unwrap_or(&Vec::new()) {
+            for alias_index in
+                aliases.get(alias_id).unwrap_or(&Vec::new())
+            {
                 anchors_aliases.push(self.event_path(*alias_index));
             }
 
@@ -331,7 +334,11 @@ impl<'de> Deserializer<'de> {
                     }
                     Event::Scalar(scalar) => {
                         if process_scalar {
-                            path.insert(0, String::from_utf8_lossy(&scalar.value).to_string());
+                            path.insert(
+                                0,
+                                String::from_utf8_lossy(&scalar.value)
+                                    .to_string(),
+                            );
                             process_scalar = false;
                         }
                     }
@@ -353,7 +360,7 @@ impl<'de> Deserializer<'de> {
 
         match self.progress {
             Progress::Iterable(_) => {
-                return Err(error::new(ErrorImpl::MoreThanOneDocument))
+                return Err(error::new(ErrorImpl::MoreThanOneDocument));
             }
             Progress::Document(document) => {
                 let t = f(&mut DeserializerFromEvents {
@@ -784,7 +791,11 @@ impl<'de, 'document> DeserializerFromEvents<'de, 'document> {
                     current_enum: None,
                 })
             }
-            None => panic!("unresolved alias: {}", *pos),
+            None => Err(error::new(ErrorImpl::UnknownAnchor(Mark {
+                index: 0,
+                line: 0,
+                column: 0,
+            }))),
         }
     }
 
@@ -808,13 +819,19 @@ impl<'de, 'document> DeserializerFromEvents<'de, 'document> {
                 Event::SequenceEnd => match stack.pop() {
                     Some(Nest::Sequence) => {}
                     None | Some(Nest::Mapping) => {
-                        panic!("unexpected end of sequence");
+                        return Err(error::new(ErrorImpl::Message(
+                            "unexpected end of sequence".into(),
+                            None,
+                        )));
                     }
                 },
                 Event::MappingEnd => match stack.pop() {
                     Some(Nest::Mapping) => {}
                     None | Some(Nest::Sequence) => {
-                        panic!("unexpected end of mapping");
+                        return Err(error::new(ErrorImpl::Message(
+                            "unexpected end of mapping".into(),
+                            None,
+                        )));
                     }
                 },
             }
@@ -881,7 +898,12 @@ impl<'de, 'document> DeserializerFromEvents<'de, 'document> {
         };
         match self.next_event()? {
             Event::SequenceEnd | Event::Void => {}
-            _ => panic!("expected a SequenceEnd event"),
+            _ => {
+                return Err(error::new(ErrorImpl::Message(
+                    "expected a SequenceEnd event".into(),
+                    None,
+                )));
+            }
         }
         if total == len {
             Ok(())
@@ -924,7 +946,12 @@ impl<'de, 'document> DeserializerFromEvents<'de, 'document> {
         };
         match self.next_event()? {
             Event::MappingEnd | Event::Void => {}
-            _ => panic!("expected a MappingEnd event"),
+            _ => {
+                return Err(error::new(ErrorImpl::Message(
+                    "expected a MappingEnd event".into(),
+                    None,
+                )));
+            }
         }
         if total == len {
             Ok(())
@@ -961,7 +988,7 @@ impl<'de, 'document> DeserializerFromEvents<'de, 'document> {
             None => {
                 return Err(error::new(
                     ErrorImpl::RecursionLimitExceeded(mark),
-                ))
+                ));
             }
         };
         let result = f(self);
@@ -1223,7 +1250,7 @@ where
             return Err(de::Error::invalid_type(
                 Unexpected::Bytes(&scalar.value),
                 &visitor,
-            ))
+            ));
         }
     };
     if let (Some(tag), false) = (&scalar.tag, tagged_already) {
@@ -1303,9 +1330,7 @@ fn parse_borrowed_str<'de>(
     let borrowed_bytes =
         borrowed_repr.get(expected_start..expected_end)?;
     if borrowed_bytes == utf8_value.as_bytes() {
-        return Some(unsafe {
-            str::from_utf8_unchecked(borrowed_bytes)
-        });
+        return str::from_utf8(borrowed_bytes).ok();
     }
     None
 }
@@ -1492,33 +1517,30 @@ pub(crate) fn digits_but_not_number(scalar: &str) -> bool {
 /// parser on the round trip, or could otherwise be ambiguous, then we should
 /// serialize it with quotes to be safe.
 /// This avoids the norway problem https://hitchdev.com/strictyaml/why/implicit-typing-removed/
-#[allow(clippy::needless_borrow)]
-#[allow(clippy::len_zero)]
-#[allow(clippy::bytes_nth)]
 pub(crate) fn ambiguous_string(scalar: &str) -> bool {
-    let lower_scalar = scalar.to_lowercase();
-    parse_bool(&lower_scalar).is_some()
-        || parse_null(&lower_scalar.as_bytes()).is_some()
-        || lower_scalar.len() == 0
-        // Can unwrap because we just checked the length.
-        || lower_scalar.bytes().nth(0).unwrap().is_ascii_digit()
-        || lower_scalar.starts_with('-')
-        || lower_scalar.starts_with('.')
-        || lower_scalar.starts_with('+')
-        // Things that we don't parse as bool but could be parsed as bool by
-        // other YAML parsers.
-        || lower_scalar == "y"
-        || lower_scalar == "yes"
-        || lower_scalar == "n"
-        || lower_scalar == "no"
-        || lower_scalar == "on"
-        || lower_scalar == "off"
-        || lower_scalar == "true"
-        || lower_scalar == "false"
-        || lower_scalar == "null"
-        || lower_scalar == "nil"
-        || lower_scalar == "~"
-        || lower_scalar == "nan"
+    if scalar.is_empty() {
+        return true;
+    }
+    let first = scalar.as_bytes()[0];
+    if first.is_ascii_digit()
+        || first == b'-'
+        || first == b'.'
+        || first == b'+'
+    {
+        return true;
+    }
+    scalar.eq_ignore_ascii_case("true")
+        || scalar.eq_ignore_ascii_case("false")
+        || scalar.eq_ignore_ascii_case("null")
+        || scalar.eq_ignore_ascii_case("~")
+        || scalar.eq_ignore_ascii_case("y")
+        || scalar.eq_ignore_ascii_case("yes")
+        || scalar.eq_ignore_ascii_case("n")
+        || scalar.eq_ignore_ascii_case("no")
+        || scalar.eq_ignore_ascii_case("on")
+        || scalar.eq_ignore_ascii_case("off")
+        || scalar.eq_ignore_ascii_case("nil")
+        || scalar.eq_ignore_ascii_case("nan")
 }
 
 pub(crate) fn visit_int<'de, V>(
@@ -1614,8 +1636,12 @@ fn invalid_type(event: &Event<'_>, exp: &dyn Expected) -> Error {
         Event::MappingStart(_) => {
             de::Error::invalid_type(Unexpected::Map, exp)
         }
-        Event::SequenceEnd => panic!("unexpected end of sequence"),
-        Event::MappingEnd => panic!("unexpected end of mapping"),
+        Event::SequenceEnd | Event::MappingEnd => {
+            de::Error::invalid_type(
+                Unexpected::Other("end of collection"),
+                exp,
+            )
+        }
         Event::Void => error::new(ErrorImpl::EndOfStream),
     }
 }
@@ -1655,8 +1681,11 @@ impl<'de> de::Deserializer<'de>
         #[allow(clippy::never_loop)]
         loop {
             match next {
-                Event::Alias(mut pos) => {
-                    break self.jump(&mut pos)?.deserialize_any(visitor)
+                Event::Alias(pos) => {
+                    let mut pos = *pos;
+                    break self
+                        .jump(&mut pos)?
+                        .deserialize_any(visitor);
                 }
                 Event::Scalar(scalar) => {
                     if let Some(tag) =
@@ -1701,11 +1730,11 @@ impl<'de> de::Deserializer<'de>
                     }
                     break self.visit_mapping(visitor, mark);
                 }
-                Event::SequenceEnd => {
-                    panic!("unexpected end of sequence")
-                }
-                Event::MappingEnd => {
-                    panic!("unexpected end of mapping")
+                Event::SequenceEnd | Event::MappingEnd => {
+                    break Err(error::new(ErrorImpl::Message(
+                        "unexpected end of collection".into(),
+                        None,
+                    )));
                 }
                 Event::Void => break visitor.visit_none(),
             }
@@ -1724,10 +1753,11 @@ impl<'de> de::Deserializer<'de>
         #[allow(clippy::never_loop)]
         loop {
             match next {
-                Event::Alias(mut pos) => {
+                Event::Alias(pos) => {
+                    let mut pos = *pos;
                     break self
                         .jump(&mut pos)?
-                        .deserialize_bool(visitor)
+                        .deserialize_bool(visitor);
                 }
                 Event::Scalar(scalar)
                     if is_plain_or_tagged_literal_scalar(
@@ -1779,8 +1809,11 @@ impl<'de> de::Deserializer<'de>
         #[allow(clippy::never_loop)]
         loop {
             match next {
-                Event::Alias(mut pos) => {
-                    break self.jump(&mut pos)?.deserialize_i64(visitor)
+                Event::Alias(pos) => {
+                    let mut pos = *pos;
+                    break self
+                        .jump(&mut pos)?
+                        .deserialize_i64(visitor);
                 }
                 Event::Scalar(scalar)
                     if is_plain_or_tagged_literal_scalar(
@@ -1813,10 +1846,11 @@ impl<'de> de::Deserializer<'de>
         #[allow(clippy::never_loop)]
         loop {
             match next {
-                Event::Alias(mut pos) => {
+                Event::Alias(pos) => {
+                    let mut pos = *pos;
                     break self
                         .jump(&mut pos)?
-                        .deserialize_i128(visitor)
+                        .deserialize_i128(visitor);
                 }
                 Event::Scalar(scalar)
                     if is_plain_or_tagged_literal_scalar(
@@ -1871,8 +1905,11 @@ impl<'de> de::Deserializer<'de>
         #[allow(clippy::never_loop)]
         loop {
             match next {
-                Event::Alias(mut pos) => {
-                    break self.jump(&mut pos)?.deserialize_u64(visitor)
+                Event::Alias(pos) => {
+                    let mut pos = *pos;
+                    break self
+                        .jump(&mut pos)?
+                        .deserialize_u64(visitor);
                 }
                 Event::Scalar(scalar)
                     if is_plain_or_tagged_literal_scalar(
@@ -1906,10 +1943,11 @@ impl<'de> de::Deserializer<'de>
         #[allow(clippy::never_loop)]
         loop {
             match next {
-                Event::Alias(mut pos) => {
+                Event::Alias(pos) => {
+                    let mut pos = *pos;
                     break self
                         .jump(&mut pos)?
-                        .deserialize_u128(visitor)
+                        .deserialize_u128(visitor);
                 }
                 Event::Scalar(scalar)
                     if is_plain_or_tagged_literal_scalar(
@@ -1950,8 +1988,11 @@ impl<'de> de::Deserializer<'de>
         #[allow(clippy::never_loop)]
         loop {
             match next {
-                Event::Alias(mut pos) => {
-                    break self.jump(&mut pos)?.deserialize_f64(visitor)
+                Event::Alias(pos) => {
+                    let mut pos = *pos;
+                    break self
+                        .jump(&mut pos)?
+                        .deserialize_f64(visitor);
                 }
                 Event::Scalar(scalar)
                     if is_plain_or_tagged_literal_scalar(
@@ -1999,7 +2040,8 @@ impl<'de> de::Deserializer<'de>
                     Err(invalid_type(next, &visitor))
                 }
             }
-            Event::Alias(mut pos) => {
+            Event::Alias(pos) => {
+                let mut pos = *pos;
                 self.jump(&mut pos)?.deserialize_str(visitor)
             }
             other => Err(invalid_type(other, &visitor)),
@@ -2034,7 +2076,8 @@ impl<'de> de::Deserializer<'de>
         V: Visitor<'de>,
     {
         let is_some = match self.peek_event()? {
-            Event::Alias(mut pos) => {
+            Event::Alias(pos) => {
+                let mut pos = *pos;
                 *self.pos += 1;
                 return self
                     .jump(&mut pos)?
@@ -2072,8 +2115,12 @@ impl<'de> de::Deserializer<'de>
                 }
             }
             Event::SequenceStart(_) | Event::MappingStart(_) => true,
-            Event::SequenceEnd => panic!("unexpected end of sequence"),
-            Event::MappingEnd => panic!("unexpected end of mapping"),
+            Event::SequenceEnd | Event::MappingEnd => {
+                return Err(error::new(ErrorImpl::Message(
+                    "unexpected end of collection".into(),
+                    None,
+                )));
+            }
             Event::Void => false,
         };
         if is_some {
@@ -2118,7 +2165,8 @@ impl<'de> de::Deserializer<'de>
                     ))
                 }
             }
-            Event::Alias(mut pos) => {
+            Event::Alias(pos) => {
+                let mut pos = *pos;
                 self.jump(&mut pos)?.deserialize_unit(visitor)
             }
             Event::Void => visitor.visit_unit(),
@@ -2159,7 +2207,8 @@ impl<'de> de::Deserializer<'de>
     {
         let (next, mark) = self.next_event_mark()?;
         match next {
-            Event::Alias(mut pos) => {
+            Event::Alias(pos) => {
+                let mut pos = *pos;
                 self.jump(&mut pos)?.deserialize_seq(visitor)
             }
             Event::SequenceStart(_) => {
@@ -2216,7 +2265,8 @@ impl<'de> de::Deserializer<'de>
     {
         let (next, mark) = self.next_event_mark()?;
         match next {
-            Event::Alias(mut pos) => {
+            Event::Alias(pos) => {
+                let mut pos = *pos;
                 self.jump(&mut pos)?.deserialize_map(visitor)
             }
             Event::MappingStart(_) => self.visit_mapping(visitor, mark),
@@ -2290,7 +2340,8 @@ impl<'de> de::Deserializer<'de>
                 break Err(error::new(ErrorImpl::Message(message, None)));
             }
             break match next {
-                Event::Alias(mut pos) => {
+                Event::Alias(pos) => {
+                    let mut pos = *pos;
                     *self.pos += 1;
                     self.jump(&mut pos)?
                         .deserialize_enum(name, variants, visitor)
@@ -2329,8 +2380,12 @@ impl<'de> de::Deserializer<'de>
                         de::Error::invalid_type(Unexpected::Seq, &"a YAML tag starting with '!'");
                     Err(error::fix_mark(err, mark, &self.path))
                 }
-                Event::SequenceEnd => panic!("unexpected end of sequence"),
-                Event::MappingEnd => panic!("unexpected end of mapping"),
+                Event::SequenceEnd | Event::MappingEnd => {
+                    Err(error::new(ErrorImpl::Message(
+                        "unexpected end of collection".into(),
+                        None,
+                    )))
+                }
                 Event::Void => Err(error::new(ErrorImpl::EndOfStream)),
             };
         }

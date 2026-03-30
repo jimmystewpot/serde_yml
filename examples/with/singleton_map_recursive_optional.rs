@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 use serde_yml::with::singleton_map_recursive;
 
 pub(crate) fn main() {
-    println!("\n❯ Executing examples/with/singleton_map_recursive_optional.rs");
+    println!(
+        "\n❯ Executing examples/with/singleton_map_recursive_optional.rs"
+    );
 
     #[derive(Serialize, Deserialize, PartialEq, Debug)]
     enum NestedEnum {

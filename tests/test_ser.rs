@@ -3,11 +3,11 @@
 mod tests {
     use indoc::indoc;
     use serde::ser::{SerializeTuple, SerializeTupleStruct};
-    use serde::{ser::Serializer as _, Serialize};
+    use serde::{Serialize, ser::Serializer as _};
     use serde_yml::ser::SerializerConfig;
     use serde_yml::{
-        libyml::emitter::{Scalar, ScalarStyle},
         Serializer, State,
+        libyml::emitter::{Scalar, ScalarStyle},
     };
     use std::{collections::BTreeMap, fmt::Write};
 
@@ -23,7 +23,7 @@ mod tests {
         };
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             serializer.emit_scalar(scalar_value).unwrap();
         }
@@ -43,7 +43,7 @@ mod tests {
         let mut buffer = Vec::new();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             serializer.emit_sequence_start().unwrap();
         }
@@ -63,7 +63,7 @@ mod tests {
         let mut buffer = Vec::new();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             serializer.emit_mapping_start().unwrap();
         }
@@ -83,7 +83,7 @@ mod tests {
         let mut buffer = Vec::new();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             serializer.emit_mapping_start().unwrap();
             serializer.flush().unwrap();
@@ -105,7 +105,7 @@ mod tests {
         let map: BTreeMap<String, i32> = BTreeMap::new();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             map.serialize(&mut serializer).unwrap();
         }
@@ -127,7 +127,7 @@ mod tests {
         map.insert("key".to_string(), 42);
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             map.serialize(&mut serializer).unwrap();
         }
@@ -152,7 +152,7 @@ mod tests {
         outer_map.insert("outer_key".to_string(), inner_map);
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             outer_map.serialize(&mut serializer).unwrap();
         }
@@ -183,7 +183,7 @@ mod tests {
         };
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             custom_struct.serialize(&mut serializer).unwrap();
         }
@@ -201,7 +201,7 @@ mod tests {
     fn test_take_tag_with_found_tag_state() {
         // Arrange
         let mut buffer = Vec::new();
-        let mut serializer = Serializer::new(&mut buffer);
+        let mut serializer = Serializer::new(&mut buffer).unwrap();
         serializer.state = State::FoundTag("test tag".to_owned());
 
         // Act
@@ -220,7 +220,7 @@ mod tests {
     fn test_take_tag_with_no_state() {
         // Arrange
         let mut buffer = Vec::new();
-        let mut serializer = Serializer::new(&mut buffer);
+        let mut serializer = Serializer::new(&mut buffer).unwrap();
 
         // Act
         let tag = serializer.take_tag();
@@ -239,7 +239,7 @@ mod tests {
         // Arrange
         let mut buffer = Vec::new();
         let buffer_clone = buffer.clone();
-        let serializer = Serializer::new(&mut buffer);
+        let serializer = Serializer::new(&mut buffer).unwrap();
 
         // Act
         let result = serializer.into_inner().unwrap();
@@ -255,7 +255,7 @@ mod tests {
         let mut buffer = Vec::new();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             serializer.serialize_bool(true).unwrap();
             serializer.serialize_bool(false).unwrap();
@@ -276,7 +276,7 @@ mod tests {
         let mut buffer = Vec::new();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             serializer.serialize_i8(42).unwrap();
             serializer.serialize_i8(-100).unwrap();
@@ -297,7 +297,7 @@ mod tests {
         let mut buffer = Vec::new();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             serializer.serialize_i16(42).unwrap();
             serializer.serialize_i16(-100).unwrap();
@@ -318,7 +318,7 @@ mod tests {
         let mut buffer = Vec::new();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             serializer.serialize_i32(42).unwrap();
             serializer.serialize_i32(-100).unwrap();
@@ -339,7 +339,7 @@ mod tests {
         let mut buffer = Vec::new();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             serializer.serialize_i64(42).unwrap();
             serializer.serialize_i64(-100).unwrap();
@@ -360,7 +360,7 @@ mod tests {
         let mut buffer = Vec::new();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
 
             // Act
             let u64_max = u64::MAX as i128;
@@ -391,7 +391,7 @@ mod tests {
         let mut buffer = Vec::new();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             serializer.serialize_f64(std::f64::consts::PI).unwrap();
             serializer.serialize_f64(f64::INFINITY).unwrap();
@@ -414,7 +414,7 @@ mod tests {
         let mut buffer = Vec::new();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             serializer.serialize_char('a').unwrap();
             serializer.serialize_char('💻').unwrap();
@@ -433,7 +433,7 @@ mod tests {
     fn test_serialize_bytes() {
         // Arrange
         let mut buffer = Vec::new();
-        let mut serializer = Serializer::new(&mut buffer);
+        let mut serializer = Serializer::new(&mut buffer).unwrap();
 
         // Act
         let bytes = vec![1, 2, 3, 4, 5];
@@ -456,19 +456,25 @@ mod tests {
         let mut buffer = Vec::new();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             let mut tuple_serializer =
                 serializer.serialize_tuple(3).unwrap();
-            SerializeTuple::serialize_element(&mut tuple_serializer, &42)
-                .unwrap();
+            SerializeTuple::serialize_element(
+                &mut tuple_serializer,
+                &42,
+            )
+            .unwrap();
             SerializeTuple::serialize_element(
                 &mut tuple_serializer,
                 &"hello",
             )
             .unwrap();
-            SerializeTuple::serialize_element(&mut tuple_serializer, &true)
-                .unwrap();
+            SerializeTuple::serialize_element(
+                &mut tuple_serializer,
+                &true,
+            )
+            .unwrap();
             SerializeTuple::end(tuple_serializer).unwrap();
         }
 
@@ -487,7 +493,7 @@ mod tests {
         let mut buffer = Vec::new();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             let mut tuple_struct_serializer = serializer
                 .serialize_tuple_struct("MyTupleStruct", 2)
@@ -522,7 +528,7 @@ mod tests {
         let none_value: Option<i32> = None;
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             some_value.serialize(&mut serializer).unwrap();
             none_value.serialize(&mut serializer).unwrap();
@@ -550,11 +556,13 @@ mod tests {
         let mut buffer = Vec::new();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             MyEnum::A.serialize(&mut serializer).unwrap();
             MyEnum::B(42).serialize(&mut serializer).unwrap();
-            MyEnum::C { x: 1, y: 2 }.serialize(&mut serializer).unwrap();
+            MyEnum::C { x: 1, y: 2 }
+                .serialize(&mut serializer)
+                .unwrap();
         }
 
         // Assert
@@ -573,7 +581,7 @@ mod tests {
         let sequence = vec!["42", "hello", "true"];
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             sequence.serialize(&mut serializer).unwrap();
         }
@@ -596,7 +604,7 @@ mod tests {
         map.insert("age", "30");
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             map.serialize(&mut serializer).unwrap();
         }
@@ -638,7 +646,7 @@ mod tests {
         };
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             person.serialize(&mut serializer).unwrap();
         }
@@ -671,7 +679,7 @@ mod tests {
         };
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             user.serialize(&mut serializer).unwrap();
         }
@@ -701,7 +709,7 @@ mod tests {
         };
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             tagged_value.serialize(&mut serializer).unwrap();
         }
@@ -722,7 +730,7 @@ mod tests {
         let large_sequence: Vec<_> = (0..1000).collect();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             large_sequence.serialize(&mut serializer).unwrap();
         }
@@ -753,7 +761,7 @@ mod tests {
         ];
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             nested_sequences.serialize(&mut serializer).unwrap();
         }
@@ -782,7 +790,7 @@ mod tests {
         nested_maps.insert("map2", inner_map2);
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             nested_maps.serialize(&mut serializer).unwrap();
         }
@@ -824,7 +832,7 @@ mod tests {
         };
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             mixed_data.serialize(&mut serializer).unwrap();
         }
@@ -846,7 +854,7 @@ mod tests {
         let empty_map: BTreeMap<String, i32> = BTreeMap::new();
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             empty_sequence.serialize(&mut serializer).unwrap();
             empty_map.serialize(&mut serializer).unwrap();
@@ -868,7 +876,7 @@ mod tests {
         let special_string = "\"'\\n\t";
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             special_string.serialize(&mut serializer).unwrap();
         }
@@ -915,7 +923,7 @@ mod tests {
         };
 
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             // Act
             custom_struct.serialize(&mut serializer).unwrap();
         }
@@ -939,7 +947,7 @@ mod tests {
         let mut buffer = vec![];
 
         {
-            let mut ser = Serializer::new(&mut buffer);
+            let mut ser = Serializer::new(&mut buffer).unwrap();
             Enum::Unit.serialize(&mut ser).unwrap();
         }
 
@@ -968,7 +976,8 @@ mod tests {
                 SerializerConfig {
                     tag_unit_variants: true,
                 },
-            );
+            )
+            .unwrap();
             Enum::Unit.serialize(&mut ser).unwrap();
         }
 
@@ -984,7 +993,7 @@ mod tests {
     /// Tests the creation of a new Serializer with the default configuration.
     fn test_new() {
         let mut buffer = Vec::new();
-        let serializer = Serializer::new(&mut buffer);
+        let serializer = Serializer::new(&mut buffer).unwrap();
         assert!(
             serializer.depth == 0,
             "Expected depth to be 0 after initialization"
@@ -996,8 +1005,12 @@ mod tests {
     fn test_new_with_config() {
         let mut buffer = Vec::new();
         let config = SerializerConfig::default();
-        let serializer = Serializer::new_with_config(&mut buffer, config);
-        assert!(serializer.depth == 0, "Expected depth to be 0 after initialization with custom config");
+        let serializer =
+            Serializer::new_with_config(&mut buffer, config).unwrap();
+        assert!(
+            serializer.depth == 0,
+            "Expected depth to be 0 after initialization with custom config"
+        );
         // Additional assertions can be added as needed.
     }
 
@@ -1006,7 +1019,7 @@ mod tests {
     fn test_flush() {
         let mut buffer = Vec::new();
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             serializer.flush().unwrap();
         }
         // Check if the buffer was properly flushed.
@@ -1026,7 +1039,7 @@ mod tests {
             style: ScalarStyle::Plain,
         };
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             serializer.emit_scalar(scalar_value).unwrap();
         }
         assert_eq!(
@@ -1041,7 +1054,7 @@ mod tests {
     fn test_emit_sequence_start() {
         let mut buffer = Vec::new();
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             serializer.emit_sequence_start().unwrap();
             serializer
                 .emit_scalar(Scalar {
@@ -1052,7 +1065,10 @@ mod tests {
                 .unwrap();
             serializer.emit_sequence_end().unwrap();
         }
-        assert!(!buffer.is_empty(), "Buffer should not be empty after emitting sequence start and a scalar");
+        assert!(
+            !buffer.is_empty(),
+            "Buffer should not be empty after emitting sequence start and a scalar"
+        );
     }
 
     #[test]
@@ -1060,7 +1076,7 @@ mod tests {
     fn test_emit_sequence_end() {
         let mut buffer = Vec::new();
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             serializer.emit_sequence_start().unwrap();
             serializer
                 .emit_scalar(Scalar {
@@ -1071,7 +1087,10 @@ mod tests {
                 .unwrap();
             serializer.emit_sequence_end().unwrap();
         }
-        assert!(buffer.ends_with(b"item\n"), "Buffer should end with the scalar value and sequence end marker");
+        assert!(
+            buffer.ends_with(b"item\n"),
+            "Buffer should end with the scalar value and sequence end marker"
+        );
     }
 
     #[test]
@@ -1079,7 +1098,7 @@ mod tests {
     fn test_emit_mapping_start() {
         let mut buffer = Vec::new();
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             serializer.emit_mapping_start().unwrap();
             serializer
                 .emit_scalar(Scalar {
@@ -1097,7 +1116,10 @@ mod tests {
                 .unwrap();
             serializer.emit_mapping_end().unwrap();
         }
-        assert!(!buffer.is_empty(), "Buffer should not be empty after emitting mapping start and key-value pair");
+        assert!(
+            !buffer.is_empty(),
+            "Buffer should not be empty after emitting mapping start and key-value pair"
+        );
     }
 
     #[test]
@@ -1105,7 +1127,7 @@ mod tests {
     fn test_emit_mapping_end() {
         let mut buffer = Vec::new();
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             serializer.emit_mapping_start().unwrap();
             serializer
                 .emit_scalar(Scalar {
@@ -1135,7 +1157,7 @@ mod tests {
         let mut buffer = Vec::new();
         let depth;
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             serializer.value_start().unwrap();
             serializer
                 .emit_scalar(Scalar {
@@ -1157,7 +1179,7 @@ mod tests {
     /// Tests the take_tag function to check if a tag can be taken from the state.
     fn test_take_tag() {
         let mut buffer = Vec::new();
-        let mut serializer = Serializer::new(&mut buffer);
+        let mut serializer = Serializer::new(&mut buffer).unwrap();
         let tag = serializer.take_tag();
         assert!(
             tag.is_none(),
@@ -1175,7 +1197,7 @@ mod tests {
             style: ScalarStyle::Plain,
         };
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             serializer.emit_scalar(scalar_value).unwrap();
         }
         assert_eq!(
@@ -1195,7 +1217,7 @@ mod tests {
             style: ScalarStyle::SingleQuoted,
         };
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             serializer.emit_scalar(scalar_value).unwrap();
         }
         assert_eq!(
@@ -1215,7 +1237,7 @@ mod tests {
             style: ScalarStyle::DoubleQuoted,
         };
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             serializer.emit_scalar(scalar_value).unwrap();
         }
         assert_eq!(
@@ -1236,7 +1258,7 @@ mod tests {
             style: ScalarStyle::Literal,
         };
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             serializer.emit_scalar(scalar_value).unwrap();
         }
         assert_eq!(
@@ -1256,7 +1278,7 @@ mod tests {
             style: ScalarStyle::Folded,
         };
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             serializer.emit_scalar(scalar_value).unwrap();
         }
         assert_eq!(
@@ -1276,7 +1298,7 @@ mod tests {
             style: ScalarStyle::Plain,
         };
         {
-            let mut serializer = Serializer::new(&mut buffer);
+            let mut serializer = Serializer::new(&mut buffer).unwrap();
             serializer.emit_scalar(scalar_value).unwrap();
         }
         assert_eq!(

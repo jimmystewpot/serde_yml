@@ -94,19 +94,15 @@ impl<'input> Loader<'input> {
             Progress::Read(mut rdr) => {
                 const MAX_ALLOC: usize = 128 * 1024 * 1024; // 128 MB
                 let mut buffer = Vec::new();
-                if let Err(io_error) =
-                    rdr.by_ref().take(MAX_ALLOC as u64).read_to_end(&mut buffer)
+                if let Err(io_error) = rdr
+                    .by_ref()
+                    .take(MAX_ALLOC as u64)
+                    .read_to_end(&mut buffer)
                 {
                     return Err(error::new(ErrorImpl::IoError(
                         io_error,
                     )));
                 }
-                if rdr.read(&mut [0u8; 1]).is_ok() && !buffer.is_empty() {
-                     // If we can still read more, it means we hit the limit
-                     // This is a bit of a hack to detect if there's more data.
-                     // A better way would be to check the length of the buffer.
-                }
-                // Check if we might have more data
                 let mut probe = [0u8; 1];
                 match rdr.read(&mut probe) {
                     Ok(0) => {} // EOF reached
@@ -118,7 +114,9 @@ impl<'input> Loader<'input> {
                             ),
                         )));
                     }
-                    Err(e) => return Err(error::new(ErrorImpl::IoError(e))),
+                    Err(e) => {
+                        return Err(error::new(ErrorImpl::IoError(e)));
+                    }
                 }
 
                 Cow::Owned(buffer)
@@ -130,7 +128,10 @@ impl<'input> Loader<'input> {
         };
 
         Ok(Loader {
-            parser: Some(Parser::new(input)),
+            parser: Some(
+                Parser::new(input)
+                    .map_err(|e| error::new(ErrorImpl::Libyml(e)))?,
+            ),
             parsed_document_count: 0,
         })
     }
@@ -215,7 +216,9 @@ impl<'input> Loader<'input> {
                 YamlEvent::Scalar(mut scalar) => {
                     if let Some(anchor) = scalar.anchor.take() {
                         let id = anchors.len();
-                        document.anchor_names.insert(id, anchor_name(&anchor));
+                        document
+                            .anchor_names
+                            .insert(id, anchor_name(&anchor));
                         document
                             .anchor_event_map
                             .insert(id, document.events.len());
@@ -226,7 +229,9 @@ impl<'input> Loader<'input> {
                 YamlEvent::SequenceStart(mut sequence_start) => {
                     if let Some(anchor) = sequence_start.anchor.take() {
                         let id = anchors.len();
-                        document.anchor_names.insert(id, anchor_name(&anchor));
+                        document
+                            .anchor_names
+                            .insert(id, anchor_name(&anchor));
                         document
                             .anchor_event_map
                             .insert(id, document.events.len());
@@ -238,7 +243,9 @@ impl<'input> Loader<'input> {
                 YamlEvent::MappingStart(mut mapping_start) => {
                     if let Some(anchor) = mapping_start.anchor.take() {
                         let id = anchors.len();
-                        document.anchor_names.insert(id, anchor_name(&anchor));
+                        document
+                            .anchor_names
+                            .insert(id, anchor_name(&anchor));
                         document
                             .anchor_event_map
                             .insert(id, document.events.len());

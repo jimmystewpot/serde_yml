@@ -32,16 +32,19 @@ impl Error {
 impl Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}", self.problem)?;
-        if self.problem_mark.line != 0 || self.problem_mark.column != 0 {
+        if self.problem_mark.line != 0 || self.problem_mark.column != 0
+        {
             write!(formatter, " at {}", self.problem_mark)?;
         } else if self.problem_offset != 0 {
             write!(formatter, " at position {}", self.problem_offset)?;
         }
         if let Some(context) = &self.context {
             write!(formatter, ", {}", context)?;
-            if (self.context_mark.line != 0 || self.context_mark.column != 0)
+            if (self.context_mark.line != 0
+                || self.context_mark.column != 0)
                 && (self.context_mark.line != self.problem_mark.line
-                    || self.context_mark.column != self.problem_mark.column)
+                    || self.context_mark.column
+                        != self.problem_mark.column)
             {
                 write!(formatter, " at {}", self.context_mark)?;
             }
@@ -54,14 +57,17 @@ impl Debug for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut f = formatter.debug_struct("Error");
         f.field("problem", &self.problem);
-        if self.problem_mark.line != 0 || self.problem_mark.column != 0 {
+        if self.problem_mark.line != 0 || self.problem_mark.column != 0
+        {
             f.field("problem_mark", &self.problem_mark);
         } else if self.problem_offset != 0 {
             f.field("problem_offset", &self.problem_offset);
         }
         if let Some(context) = &self.context {
             f.field("context", context);
-            if self.context_mark.line != 0 || self.context_mark.column != 0 {
+            if self.context_mark.line != 0
+                || self.context_mark.column != 0
+            {
                 f.field("context_mark", &self.context_mark);
             }
         }

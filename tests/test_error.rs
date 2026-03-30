@@ -156,8 +156,7 @@ fn test_second_document_syntax_error() {
 
     let second_doc = de.next().unwrap();
     let result = <usize as Deserialize>::deserialize(second_doc);
-    let expected =
-        "did not find expected node content at line 4 column 1, while parsing a block node";
+    let expected = "did not find expected node content at line 4 column 1, while parsing a block node";
     assert_eq!(expected, result.unwrap_err().to_string());
 }
 

@@ -1,7 +1,7 @@
 //! Test suite for the serde_yml crate.
 #[cfg(test)]
 mod tests {
-    use serde_yml::value::{tagged::nobang, Tag};
+    use serde_yml::value::{Tag, tagged::nobang};
 
     /// Test for creating a new Tag.
     #[test]

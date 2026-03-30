@@ -3,8 +3,8 @@
 //! This file demonstrates the usage of the `Index` trait with various implementations,
 //! including indexing into sequences and mappings, and handling out-of-bounds and invalid indices.
 
-use serde_yml::value::Index;
 use serde_yml::Value;
+use serde_yml::value::Index;
 
 pub(crate) fn main() {
     // Print a message to indicate the file being executed.

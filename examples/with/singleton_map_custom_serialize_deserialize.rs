@@ -6,9 +6,9 @@
 //!
 
 use serde::{
+    Deserialize, Serialize,
     de::{self, Deserializer, IgnoredAny, MapAccess, Visitor},
     ser::{SerializeMap, Serializer},
-    Deserialize, Serialize,
 };
 use std::fmt;
 
@@ -78,7 +78,9 @@ impl<'de> Deserialize<'de> for MyStruct {
 }
 
 pub(crate) fn main() {
-    println!("\n❯ Executing examples/with/singleton_map_custom_serialize_deserialize.rs");
+    println!(
+        "\n❯ Executing examples/with/singleton_map_custom_serialize_deserialize.rs"
+    );
 
     let input = MyStruct {
         field: MyEnum::Variant2 { field: 42 },

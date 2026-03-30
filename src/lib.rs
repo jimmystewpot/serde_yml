@@ -27,7 +27,7 @@
 //!```toml
 //![dependencies]
 //!serde = "1.0"
-//!serde_yml = "0.0.12"
+//!serde_yml = "1.0"
 //!```
 //!
 //!## Usage
@@ -64,7 +64,7 @@
 //!
 //!## Rust Version Compatibility
 //!
-//!Compiler support: requires rustc 1.56.0+
+//!Compiler support: requires rustc 1.94.0+
 //!
 //! ## Examples
 //!
@@ -109,13 +109,13 @@
 
 // Re-export commonly used items from other modules
 pub use crate::de::{
-    from_reader, from_slice, from_str, Deserializer, DocumentAnchor
+    Deserializer, DocumentAnchor, from_reader, from_slice, from_str,
 }; // Deserialization functions
 pub use crate::modules::error::{Error, Location, Result}; // Error handling types
-pub use crate::ser::{to_string, to_writer, Serializer, State}; // Serialization functions
+pub use crate::ser::{Serializer, State, to_string, to_writer}; // Serialization functions
 #[doc(inline)]
 pub use crate::value::{
-    from_value, to_value, Index, Number, Sequence, Value,
+    Index, Number, Sequence, Value, from_value, to_value,
 }; // Value manipulation functions
 
 #[doc(inline)]

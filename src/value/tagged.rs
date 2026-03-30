@@ -5,14 +5,14 @@
 use crate::{
     modules::error::Error,
     value::{
-        de::{MapDeserializer, SeqDeserializer},
         Value,
+        de::{MapDeserializer, SeqDeserializer},
     },
 };
 use serde::{
     de::{
-        value::StrDeserializer, Deserialize, DeserializeSeed,
-        Deserializer, EnumAccess, Error as _, VariantAccess, Visitor,
+        Deserialize, DeserializeSeed, Deserializer, EnumAccess,
+        Error as _, VariantAccess, Visitor, value::StrDeserializer,
     },
     forward_to_deserialize_any,
     ser::{Serialize, SerializeMap, Serializer},

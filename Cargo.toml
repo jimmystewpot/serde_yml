@@ -5,16 +5,15 @@ description = """
 A robust Rust library that simplifies the serialization and deserialization of Rust data structures to and from YAML format using the widely-used Serde framework.
 """
 documentation = "https://docs.rs/serde_yml/"
-edition = "2021"
+edition = "2024"
 exclude = ["/.git/*", "/.github/*", "/.gitignore", "/.vscode/*"]
-homepage = "https://serdeyml.com"
 keywords = ["yaml", "serde", "serialization"]
 license = "MIT OR Apache-2.0"
 name = "serde_yml"
 readme = "README.md"
-repository = "https://github.com/sebastienrousseau/serde_yml"
-rust-version = "1.56.0"
-version = "0.0.12"
+repository = "https://github.com/jimmystewpot/serde_yml"
+rust-version = "1.94"
+version = "1.0.0"
 include = [
     "/CONTRIBUTING.md",
     "/LICENSE-APACHE",
@@ -96,7 +95,7 @@ elided_lifetimes_in_paths = "allow"
 non_camel_case_types = "allow"
 non_upper_case_globals = "allow"
 trivial_bounds = "allow"
-unsafe_code = "allow"
+unsafe_code = "deny"
 
 ## Forbid
 # missing_docs = "warn"
@@ -157,7 +156,7 @@ debug-assertions = false
 incremental = false
 lto = true
 opt-level = "s"
-overflow-checks = false
+overflow-checks = true
 panic = "abort"
 rpath = false
 strip = "symbols"

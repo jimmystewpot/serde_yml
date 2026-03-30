@@ -90,9 +90,15 @@ pub(crate) fn main() {
 
     for tag in &tags {
         if tag.starts_with("tag:example.org").unwrap_or(false) {
-            println!("\n✅ The tag {:?} starts with the prefix 'tag:example.org'", tag);
+            println!(
+                "\n✅ The tag {:?} starts with the prefix 'tag:example.org'",
+                tag
+            );
         } else {
-            println!("\n✅ The tag {:?} does not start with the prefix 'tag:example.org'", tag);
+            println!(
+                "\n✅ The tag {:?} does not start with the prefix 'tag:example.org'",
+                tag
+            );
         }
     }
 
@@ -141,7 +147,9 @@ pub(crate) fn main() {
             "\n✅ The invalid_tag starts with the given prefix."
         ),
         Err(TagFormatError) => {
-            println!("\n❌ Error: The prefix is longer than the invalid_tag.")
+            println!(
+                "\n❌ Error: The prefix is longer than the invalid_tag."
+            )
         }
     }
 
@@ -156,9 +164,18 @@ pub(crate) fn main() {
     for yaml_tag in yaml_tags {
         let tag = Tag::new(yaml_tag);
         match tag.starts_with("tag:example.org") {
-            Ok(true) => println!("\n✅ The tag {:?} is valid and starts with 'tag:example.org'", tag),
-            Ok(false) => println!("\n✅ The tag {:?} is valid but does not start with 'tag:example.org'", tag),
-            Err(TagFormatError) => println!("\n❌ The tag {:?} is invalid or the prefix is too long", tag),
+            Ok(true) => println!(
+                "\n✅ The tag {:?} is valid and starts with 'tag:example.org'",
+                tag
+            ),
+            Ok(false) => println!(
+                "\n✅ The tag {:?} is valid but does not start with 'tag:example.org'",
+                tag
+            ),
+            Err(TagFormatError) => println!(
+                "\n❌ The tag {:?} is invalid or the prefix is too long",
+                tag
+            ),
         }
     }
 }

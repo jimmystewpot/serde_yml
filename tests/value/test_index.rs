@@ -1,8 +1,8 @@
 //! Test suite for the serde_yml crate.
 #[cfg(test)]
 mod tests {
-    use serde_yml::value::Index;
     use serde_yml::Value;
+    use serde_yml::value::Index;
 
     /// Test for `index_into` method of `usize` implementation.
     /// This test verifies that `index_into` correctly indexes into a `Value::Sequence`.

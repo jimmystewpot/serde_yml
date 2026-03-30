@@ -25,7 +25,7 @@ pub(crate) fn main() {
         city: "New York".to_string(),
     };
 
-    let mut serializer = Serializer::new(std::io::stdout());
+    let mut serializer = Serializer::new(std::io::stdout()).unwrap();
     person.serialize(&mut serializer).unwrap();
 
     println!("\n✅ Person serialized to YAML.");

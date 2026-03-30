@@ -6,7 +6,7 @@
 //!
 
 use serde::Serialize;
-use serde_yml::{to_string, Result};
+use serde_yml::{Result, to_string};
 use std::collections::HashMap;
 
 #[derive(Serialize)]

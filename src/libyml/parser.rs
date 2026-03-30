@@ -7,7 +7,9 @@ use std::{
     collections::VecDeque,
     fmt::{self, Debug},
 };
-use yaml_rust2::parser::{Event as YamlEvent, MarkedEventReceiver, Parser as YamlParser};
+use yaml_rust2::parser::{
+    Event as YamlEvent, MarkedEventReceiver, Parser as YamlParser,
+};
 use yaml_rust2::scanner::{Marker, TScalarStyle};
 
 /// Represents a YAML parser.
@@ -95,26 +97,54 @@ pub enum ScalarStyle {
 
 impl<'input> Parser<'input> {
     /// Creates a new `Parser` instance with the given input data.
-    pub fn new(input: Cow<'input, [u8]>) -> Parser<'input> {
+    ///
+    /// Returns an error if the input is not valid UTF-8 or if the YAML
+    /// parser encounters a syntax error.
+    pub fn new(input: Cow<'input, [u8]>) -> Result<Parser<'input>> {
+        let input_str =
+            std::str::from_utf8(&input).map_err(|e| Error {
+                problem: format!("input is not valid UTF-8: {}", e),
+                problem_offset: e.valid_up_to() as u64,
+                problem_mark: Mark {
+                    index: e.valid_up_to() as u64,
+                    line: 0,
+                    column: 0,
+                },
+                context: None,
+                context_mark: Mark::default(),
+            })?;
+
         let mut events = VecDeque::new();
-        let input_str = String::from_utf8_lossy(&input);
-        
         let mut parser = YamlParser::new(input_str.chars());
         let mut collector = EventCollector {
             events: &mut events,
             anchors: Vec::new(),
         };
-        
-        // Pass 'true' to load to enable document start/end events
-        if let Err(_e) = parser.load(&mut collector, true) {
-            // Error handling could be improved by storing the error
+
+        if let Err(scan_error) = parser.load(&mut collector, true) {
+            return Err(Error {
+                problem: scan_error.to_string(),
+                problem_offset: 0,
+                problem_mark: Mark {
+                    index: scan_error.marker().index() as u64,
+                    line: scan_error.marker().line() as u64,
+                    column: scan_error.marker().col() as u64,
+                },
+                context: None,
+                context_mark: Mark::default(),
+            });
         }
 
-        Parser { events, _input: input }
+        Ok(Parser {
+            events,
+            _input: input,
+        })
     }
 
     /// Parses the next YAML event from the input.
-    pub fn parse_next_event(&mut self) -> Result<(Event<'input>, Mark)> {
+    pub fn parse_next_event(
+        &mut self,
+    ) -> Result<(Event<'input>, Mark)> {
         self.events.pop_front().ok_or_else(|| Error {
             problem: "Unexpected end of event stream".to_string(),
             problem_offset: 0,
@@ -152,12 +182,16 @@ impl MarkedEventReceiver for EventCollector<'_, '_> {
                 if id > 0 && id <= self.anchors.len() {
                     Event::Alias(self.anchors[id - 1].clone())
                 } else {
-                    Event::Alias(Anchor(Box::from(b"unknown".as_slice())))
+                    Event::Alias(Anchor(Box::from(
+                        b"unknown".as_slice(),
+                    )))
                 }
             }
             YamlEvent::Scalar(val, style, id, tag) => {
                 let anchor = if id > 0 {
-                    let a = Anchor(Box::from(format!("&{}", id).into_bytes()));
+                    let a = Anchor(Box::from(
+                        format!("&{}", id).into_bytes(),
+                    ));
                     if id > self.anchors.len() {
                         self.anchors.resize(id, a.clone());
                     }
@@ -172,8 +206,12 @@ impl MarkedEventReceiver for EventCollector<'_, '_> {
                     value: Box::from(val.as_bytes()),
                     style: match style {
                         TScalarStyle::Plain => ScalarStyle::Plain,
-                        TScalarStyle::SingleQuoted => ScalarStyle::SingleQuoted,
-                        TScalarStyle::DoubleQuoted => ScalarStyle::DoubleQuoted,
+                        TScalarStyle::SingleQuoted => {
+                            ScalarStyle::SingleQuoted
+                        }
+                        TScalarStyle::DoubleQuoted => {
+                            ScalarStyle::DoubleQuoted
+                        }
                         TScalarStyle::Literal => ScalarStyle::Literal,
                         TScalarStyle::Folded => ScalarStyle::Folded,
                     },
@@ -182,7 +220,9 @@ impl MarkedEventReceiver for EventCollector<'_, '_> {
             }
             YamlEvent::SequenceStart(id, tag) => {
                 let anchor = if id > 0 {
-                    let a = Anchor(Box::from(format!("&{}", id).into_bytes()));
+                    let a = Anchor(Box::from(
+                        format!("&{}", id).into_bytes(),
+                    ));
                     if id > self.anchors.len() {
                         self.anchors.resize(id, a.clone());
                     }
@@ -199,7 +239,9 @@ impl MarkedEventReceiver for EventCollector<'_, '_> {
             YamlEvent::SequenceEnd => Event::SequenceEnd,
             YamlEvent::MappingStart(id, tag) => {
                 let anchor = if id > 0 {
-                    let a = Anchor(Box::from(format!("&{}", id).into_bytes()));
+                    let a = Anchor(Box::from(
+                        format!("&{}", id).into_bytes(),
+                    ));
                     if id > self.anchors.len() {
                         self.anchors.resize(id, a.clone());
                     }

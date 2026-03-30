@@ -12,7 +12,9 @@ use serde_yml::with::singleton_map_recursive;
 
 pub(crate) fn main() {
     // Print a message to indicate the file being executed.
-    println!("\n❯ Executing examples/with/singleton_map_recursive_deep_nesting.rs");
+    println!(
+        "\n❯ Executing examples/with/singleton_map_recursive_deep_nesting.rs"
+    );
 
     // Define an enum with deeply nested enums
     #[derive(Serialize, Deserialize, PartialEq, Debug)]

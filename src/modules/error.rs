@@ -110,7 +110,11 @@ pub(crate) fn shared(error: Arc<ErrorImpl>) -> Error {
     Error(Box::new(ErrorImpl::Message(format!("{:?}", error), None)))
 }
 
-pub(crate) fn fix_mark(mut err: Error, mark: libyml_error::Mark, path: &crate::modules::path::Path<'_>) -> Error {
+pub(crate) fn fix_mark(
+    mut err: Error,
+    mark: libyml_error::Mark,
+    path: &crate::modules::path::Path<'_>,
+) -> Error {
     match err.0.as_mut() {
         ErrorImpl::Message(_, pos) => {
             if pos.is_none() {
@@ -133,10 +137,18 @@ impl Error {
     /// Returns the location of the error, if available.
     pub fn location(&self) -> Option<Location> {
         match self.0.as_ref() {
-            ErrorImpl::Message(_, Some(pos)) => Some(Location::from_mark(pos.mark)),
-            ErrorImpl::Libyml(err) => Some(Location::from_mark(err.mark())),
-            ErrorImpl::RecursionLimitExceeded(mark) => Some(Location::from_mark(*mark)),
-            ErrorImpl::UnknownAnchor(mark) => Some(Location::from_mark(*mark)),
+            ErrorImpl::Message(_, Some(pos)) => {
+                Some(Location::from_mark(pos.mark))
+            }
+            ErrorImpl::Libyml(err) => {
+                Some(Location::from_mark(err.mark()))
+            }
+            ErrorImpl::RecursionLimitExceeded(mark) => {
+                Some(Location::from_mark(*mark))
+            }
+            ErrorImpl::UnknownAnchor(mark) => {
+                Some(Location::from_mark(*mark))
+            }
             _ => None,
         }
     }
@@ -152,10 +164,16 @@ impl Error {
                 }),
             ),
             ErrorImpl::Libyml(err) => ErrorImpl::Libyml(err.clone()),
-            ErrorImpl::IoError(_) => ErrorImpl::EndOfStream, // Can't clone io::Error
-            ErrorImpl::FromUtf8(err) => ErrorImpl::FromUtf8(err.clone()),
+            ErrorImpl::IoError(e) => {
+                ErrorImpl::Message(e.to_string(), None)
+            }
+            ErrorImpl::FromUtf8(err) => {
+                ErrorImpl::FromUtf8(err.clone())
+            }
             ErrorImpl::EndOfStream => ErrorImpl::EndOfStream,
-            ErrorImpl::MoreThanOneDocument => ErrorImpl::MoreThanOneDocument,
+            ErrorImpl::MoreThanOneDocument => {
+                ErrorImpl::MoreThanOneDocument
+            }
             ErrorImpl::RecursionLimitExceeded(mark) => {
                 ErrorImpl::RecursionLimitExceeded(*mark)
             }
@@ -166,7 +184,9 @@ impl Error {
             ErrorImpl::UnknownAnchor(mark) => {
                 ErrorImpl::UnknownAnchor(*mark)
             }
-            ErrorImpl::SerializeNestedEnum => ErrorImpl::SerializeNestedEnum,
+            ErrorImpl::SerializeNestedEnum => {
+                ErrorImpl::SerializeNestedEnum
+            }
             ErrorImpl::ScalarInMerge => ErrorImpl::ScalarInMerge,
             ErrorImpl::TaggedInMerge => ErrorImpl::TaggedInMerge,
             ErrorImpl::ScalarInMergeElement => {
@@ -175,8 +195,12 @@ impl Error {
             ErrorImpl::SequenceInMergeElement => {
                 ErrorImpl::SequenceInMergeElement
             }
-            ErrorImpl::ExpectedMapInMerge => ErrorImpl::ExpectedMapInMerge,
-            ErrorImpl::FailedToParseNumber => ErrorImpl::FailedToParseNumber,
+            ErrorImpl::ExpectedMapInMerge => {
+                ErrorImpl::ExpectedMapInMerge
+            }
+            ErrorImpl::FailedToParseNumber => {
+                ErrorImpl::FailedToParseNumber
+            }
             ErrorImpl::EmptyTag => ErrorImpl::EmptyTag,
         })
     }

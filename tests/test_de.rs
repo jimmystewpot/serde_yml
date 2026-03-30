@@ -12,15 +12,14 @@ mod tests {
     use indoc::indoc;
     use serde_derive::Deserialize;
     use serde_yml::{
+        Deserializer, DocumentAnchor, Number,
+        Value::{self, String as SerdeString},
         de::{Event, Progress},
         libyml::parser::{
             MappingStart, Scalar, ScalarStyle::Plain, SequenceStart,
         },
         loader::Loader,
         modules::error::ErrorImpl,
-        Deserializer, Number,
-        DocumentAnchor,
-        Value::{self, String as SerdeString},
     };
     use std::{
         collections::BTreeMap,
@@ -588,12 +587,16 @@ mod tests {
     #[test]
     /// Test handling of NaN (Not a Number) in YAML.
     fn test_nan() {
-        assert!(serde_yml::from_str::<f32>(".nan")
-            .unwrap()
-            .is_sign_positive());
-        assert!(serde_yml::from_str::<f64>(".nan")
-            .unwrap()
-            .is_sign_positive());
+        assert!(
+            serde_yml::from_str::<f32>(".nan")
+                .unwrap()
+                .is_sign_positive()
+        );
+        assert!(
+            serde_yml::from_str::<f64>(".nan")
+                .unwrap()
+                .is_sign_positive()
+        );
     }
 
     #[test]
@@ -792,8 +795,10 @@ mod tests {
             }
         };
         let progress = Progress::Iterable(loader);
-        assert!(format!("{:?}", progress)
-            .starts_with("Progress::Iterable("));
+        assert!(
+            format!("{:?}", progress)
+                .starts_with("Progress::Iterable(")
+        );
     }
 
     #[test]
@@ -811,8 +816,10 @@ mod tests {
             None => panic!("Expected a Document"),
         };
         let progress = Progress::Document(document);
-        assert!(format!("{:?}", progress)
-            .starts_with("Progress::Document("));
+        assert!(
+            format!("{:?}", progress)
+                .starts_with("Progress::Document(")
+        );
     }
 
     #[test]
@@ -842,11 +849,16 @@ mod tests {
                 ..
             }) => {
                 if doc.error.is_none() {
-                    panic!("Expected an error within the Document, but none was found.");
+                    panic!(
+                        "Expected an error within the Document, but none was found."
+                    );
                 }
             }
             Some(Deserializer { progress, .. }) => {
-                panic!("Expected Progress::Document with an error, but got: {:?}", progress);
+                panic!(
+                    "Expected Progress::Document with an error, but got: {:?}",
+                    progress
+                );
             }
             None => {
                 panic!("Expected an error but none was found.");

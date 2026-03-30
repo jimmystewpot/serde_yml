@@ -14,16 +14,17 @@ pub(crate) fn main() {
     // Example 1: Creating a parser and parsing a stream start event
     {
         let input = Cow::Borrowed(b"foo: bar\n");
-        let mut parser = Parser::new(Cow::Borrowed(input.as_ref()));
+        let mut parser =
+            Parser::new(Cow::Borrowed(input.as_ref())).unwrap();
         match parser.parse_next_event() {
-            Ok((event, _)) => {
-                match event {
-                    Event::StreamStart => {
-                        println!("\n✅ Stream start event parsed successfully.")
-                    }
-                    _ => println!("\n❌ Unexpected event."),
+            Ok((event, _)) => match event {
+                Event::StreamStart => {
+                    println!(
+                        "\n✅ Stream start event parsed successfully."
+                    )
                 }
-            }
+                _ => println!("\n❌ Unexpected event."),
+            },
             Err(err) => println!("Error parsing event: {:?}", err),
         }
     }
@@ -31,7 +32,7 @@ pub(crate) fn main() {
     // Example 2: Parsing a stream end event
     {
         let input = Cow::Borrowed(b"foo: bar\n").as_ref();
-        let mut parser = Parser::new(Cow::Borrowed(input));
+        let mut parser = Parser::new(Cow::Borrowed(input)).unwrap();
         while let Ok((event, _)) = parser.parse_next_event() {
             if matches!(event, Event::StreamEnd) {
                 println!("\n✅ Stream end event parsed successfully.");
@@ -43,7 +44,7 @@ pub(crate) fn main() {
     // Example 3: Parsing a document start event
     {
         let input = Cow::Borrowed(b"---\nfoo: bar\n").as_ref();
-        let mut parser = Parser::new(Cow::Borrowed(input));
+        let mut parser = Parser::new(Cow::Borrowed(input)).unwrap();
         while let Ok((event, _)) = parser.parse_next_event() {
             if matches!(event, Event::DocumentStart) {
                 println!(
@@ -58,7 +59,7 @@ pub(crate) fn main() {
     {
         let input =
             Cow::Borrowed(b"foo: bar\n---\nbaz: qux\n").as_ref();
-        let mut parser = Parser::new(Cow::Borrowed(input));
+        let mut parser = Parser::new(Cow::Borrowed(input)).unwrap();
         while let Ok((event, _)) = parser.parse_next_event() {
             if matches!(event, Event::DocumentEnd) {
                 println!(
@@ -72,7 +73,7 @@ pub(crate) fn main() {
     // Example 5: Parsing a scalar event
     {
         let input = Cow::Borrowed(b"bar\n").as_ref();
-        let mut parser = Parser::new(Cow::Borrowed(input));
+        let mut parser = Parser::new(Cow::Borrowed(input)).unwrap();
         while let Ok((event, _)) = parser.parse_next_event() {
             if let Event::Scalar(scalar) = event {
                 println!(
@@ -87,7 +88,7 @@ pub(crate) fn main() {
     // Example 6: Parsing a sequence start event
     {
         let input = Cow::Borrowed(b"- item1\n- item2\n").as_ref();
-        let mut parser = Parser::new(Cow::Borrowed(input));
+        let mut parser = Parser::new(Cow::Borrowed(input)).unwrap();
         while let Ok((event, _)) = parser.parse_next_event() {
             if matches!(event, Event::SequenceStart(_)) {
                 println!(
@@ -101,7 +102,7 @@ pub(crate) fn main() {
     // Example 7: Parsing a sequence end event
     {
         let input = Cow::Borrowed(b"- item1\n- item2\n").as_ref();
-        let mut parser = Parser::new(Cow::Borrowed(input));
+        let mut parser = Parser::new(Cow::Borrowed(input)).unwrap();
         while let Ok((event, _)) = parser.parse_next_event() {
             if matches!(event, Event::SequenceEnd) {
                 println!(
@@ -115,7 +116,7 @@ pub(crate) fn main() {
     // Example 8: Parsing a mapping start event
     {
         let input = Cow::Borrowed(b"key: value\n").as_ref();
-        let mut parser = Parser::new(Cow::Borrowed(input));
+        let mut parser = Parser::new(Cow::Borrowed(input)).unwrap();
         while let Ok((event, _)) = parser.parse_next_event() {
             if matches!(event, Event::MappingStart(_)) {
                 println!(
@@ -129,7 +130,7 @@ pub(crate) fn main() {
     // Example 9: Parsing a mapping end event
     {
         let input = Cow::Borrowed(b"key: value\n").as_ref();
-        let mut parser = Parser::new(Cow::Borrowed(input));
+        let mut parser = Parser::new(Cow::Borrowed(input)).unwrap();
         while let Ok((event, _)) = parser.parse_next_event() {
             if matches!(event, Event::MappingEnd) {
                 println!("\n✅ Mapping end event parsed successfully.");
@@ -141,13 +142,23 @@ pub(crate) fn main() {
     // Example 10: Handling unexpected input
     {
         let input = Cow::Borrowed(b"unexpected: [value").as_ref(); // Malformed YAML
-        let mut parser = Parser::new(Cow::Borrowed(input));
-        match parser.parse_next_event() {
-            Ok(_) => println!(
-                "\n❌ Unexpectedly parsed malformed input without error."
-            ),
+        match Parser::new(Cow::Borrowed(input)) {
+            Ok(mut parser) => match parser.parse_next_event() {
+                Ok(_) => println!(
+                    "\n❌ Unexpectedly parsed malformed input without error."
+                ),
+                Err(err) => {
+                    println!(
+                        "\n❌ Error parsing malformed input: {:?}",
+                        err
+                    )
+                }
+            },
             Err(err) => {
-                println!("\n❌ Error parsing malformed input: {:?}", err)
+                println!(
+                    "\n✅ Error constructing parser for malformed input: {:?}",
+                    err
+                )
             }
         }
     }
@@ -155,13 +166,17 @@ pub(crate) fn main() {
     // Example 11: Handling empty input
     {
         let input = Cow::Borrowed(b"").as_ref();
-        let mut parser = Parser::new(Cow::Borrowed(input));
+        let mut parser = Parser::new(Cow::Borrowed(input)).unwrap();
         match parser.parse_next_event() {
             Ok((event, _)) => match event {
-                Event::StreamEnd => println!("Stream end event parsed successfully for empty input."),
+                Event::StreamEnd => println!(
+                    "Stream end event parsed successfully for empty input."
+                ),
                 _ => println!("Unexpected event for empty input."),
             },
-            Err(err) => println!("Error parsing empty input: {:?}", err),
+            Err(err) => {
+                println!("Error parsing empty input: {:?}", err)
+            }
         }
     }
 
@@ -170,13 +185,15 @@ pub(crate) fn main() {
         let input =
             Cow::Borrowed(b"- item1\n- - nested1\n  - nested2\n")
                 .as_ref();
-        let mut parser = Parser::new(Cow::Borrowed(input));
+        let mut parser = Parser::new(Cow::Borrowed(input)).unwrap();
         let mut found_nested_start = false;
 
         while let Ok((event, _)) = parser.parse_next_event() {
             if matches!(event, Event::SequenceStart(_)) {
                 if found_nested_start {
-                    println!("\n✅ Nested sequence start event parsed successfully.");
+                    println!(
+                        "\n✅ Nested sequence start event parsed successfully."
+                    );
                     break;
                 } else {
                     found_nested_start = true;
@@ -193,7 +210,7 @@ pub(crate) fn main() {
     {
         let input =
             Cow::Borrowed(b"- item1\nkey: value\n- item2\n").as_ref();
-        let mut parser = Parser::new(Cow::Borrowed(input));
+        let mut parser = Parser::new(Cow::Borrowed(input)).unwrap();
         let mut found_sequence = false;
         let mut found_mapping = false;
 
@@ -205,7 +222,9 @@ pub(crate) fn main() {
                 found_mapping = true;
             }
             if found_sequence && found_mapping {
-                println!("\n✅ Mixed content parsed successfully (sequence and mapping).");
+                println!(
+                    "\n✅ Mixed content parsed successfully (sequence and mapping)."
+                );
                 break;
             }
         }
@@ -221,13 +240,18 @@ pub(crate) fn main() {
     // Example 14: Error handling with invalid input
     {
         let input = Cow::Borrowed(b"invalid: [yaml").as_ref(); // Invalid YAML
-        let mut parser = Parser::new(Cow::Borrowed(input));
-        match parser.parse_next_event() {
-            Ok(_) => println!(
-                "\n❌ Unexpectedly parsed invalid input without error."
-            ),
+        match Parser::new(Cow::Borrowed(input)) {
+            Ok(mut parser) => match parser.parse_next_event() {
+                Ok(_) => println!(
+                    "\n❌ Unexpectedly parsed invalid input without error."
+                ),
+                Err(err) => println!(
+                    "\n✅ Correctly handled error for invalid input: {:?}",
+                    err
+                ),
+            },
             Err(err) => println!(
-                "\n✅ Correctly handled error for invalid input: {:?}",
+                "\n✅ Correctly handled error at parser construction: {:?}",
                 err
             ),
         }
@@ -250,7 +274,7 @@ pub(crate) fn main() {
             b"- item1\n- item2:\n  - nested1\n  - nested2\n- item3\n",
         )
         .as_ref();
-        let mut parser = Parser::new(Cow::Borrowed(input));
+        let mut parser = Parser::new(Cow::Borrowed(input)).unwrap();
         while let Ok((event, _)) = parser.parse_next_event() {
             match event {
                 Event::SequenceStart(_) => {
@@ -271,7 +295,7 @@ pub(crate) fn main() {
     {
         let input =
             Cow::Borrowed(b"# This is a comment\nfoo: bar\n").as_ref();
-        let mut parser = Parser::new(Cow::Borrowed(input));
+        let mut parser = Parser::new(Cow::Borrowed(input)).unwrap();
         while let Ok((event, _)) = parser.parse_next_event() {
             match event {
                 Event::Scalar(scalar) => {

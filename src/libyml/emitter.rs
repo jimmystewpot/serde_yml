@@ -1,19 +1,28 @@
 use crate::libyml::error::{Error, Result};
 use std::fmt::{self, Debug};
 use std::io;
-use yaml_rust2::Yaml;
-use hashlink::LinkedHashMap;
+
+/// Context for tracking nesting in the emitter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Context {
+    /// Inside a sequence, tracks how many items have been emitted.
+    Sequence { items: usize },
+    /// Inside a mapping, tracks how many scalars have been emitted (key/value pairs).
+    Mapping { entries: usize },
+}
 
 /// A YAML emitter.
 pub struct Emitter<'a, W> {
     writer: W,
     _phantom: std::marker::PhantomData<&'a ()>,
+    stack: Vec<Context>,
+    need_newline: bool,
+    first_item_inline: bool,
 }
 
 impl<W> Debug for Emitter<'_, W> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Emitter")
-            .finish()
+        f.debug_struct("Emitter").finish()
     }
 }
 
@@ -91,29 +100,272 @@ where
         Emitter {
             writer: write,
             _phantom: std::marker::PhantomData,
+            stack: Vec::new(),
+            need_newline: false,
+            first_item_inline: false,
+        }
+    }
+
+    fn io_err(e: io::Error) -> Error {
+        Error {
+            problem: format!("IO error: {}", e),
+            problem_offset: 0,
+            problem_mark: Default::default(),
+            context: None,
+            context_mark: Default::default(),
+        }
+    }
+
+    fn write_all(&mut self, buf: &[u8]) -> Result<()> {
+        self.writer.write_all(buf).map_err(Self::io_err)
+    }
+
+    fn indent_depth(&self) -> usize {
+        let mut depth = 0;
+        for ctx in &self.stack {
+            match ctx {
+                Context::Mapping { .. } => depth += 1,
+                Context::Sequence { .. } => depth += 1,
+            }
+        }
+        if depth > 0 { depth - 1 } else { 0 }
+    }
+
+    fn write_indent(&mut self) -> Result<()> {
+        let depth = self.indent_depth();
+        for _ in 0..depth {
+            self.write_all(b"  ")?;
+        }
+        Ok(())
+    }
+
+    fn is_mapping_key(&self) -> bool {
+        matches!(self.stack.last(), Some(Context::Mapping { entries }) if entries % 2 == 0)
+    }
+
+    fn is_mapping_value(&self) -> bool {
+        matches!(self.stack.last(), Some(Context::Mapping { entries }) if entries % 2 == 1)
+    }
+
+    fn increment_parent(&mut self) {
+        match self.stack.last_mut() {
+            Some(Context::Sequence { items }) => *items += 1,
+            Some(Context::Mapping { entries }) => *entries += 1,
+            None => {}
         }
     }
 
     /// Emits a YAML event.
     pub fn emit(&mut self, event: Event<'_>) -> Result<()> {
         match event {
+            Event::StreamStart | Event::StreamEnd => {}
+            Event::DocumentStart | Event::DocumentEnd => {}
             Event::Scalar(scalar) => {
-                self.writer.write_all(scalar.value.as_bytes()).map_err(|e| Error {
-                    problem: format!("IO error: {}", e),
-                    problem_offset: 0,
-                    problem_mark: Default::default(),
-                    context: None,
-                    context_mark: Default::default(),
-                })?;
-                self.writer.write_all(b"\n").map_err(|e| Error {
-                    problem: format!("IO error: {}", e),
-                    problem_offset: 0,
-                    problem_mark: Default::default(),
-                    context: None,
-                    context_mark: Default::default(),
-                })?;
+                let in_seq = matches!(
+                    self.stack.last(),
+                    Some(Context::Sequence { .. })
+                );
+                let is_key = self.is_mapping_key();
+                let is_value = self.is_mapping_value();
+
+                if self.first_item_inline {
+                    self.first_item_inline = false;
+                    if in_seq {
+                        self.write_all(b"- ")?;
+                    }
+                } else if in_seq {
+                    self.write_indent()?;
+                    self.write_all(b"- ")?;
+                } else if is_key {
+                    if self.need_newline {
+                        self.write_all(b"\n")?;
+                    }
+                    self.write_indent()?;
+                } else if is_value {
+                    self.write_all(b": ")?;
+                }
+
+                if let Some(ref tag) = scalar.tag {
+                    self.write_all(tag.as_bytes())?;
+                    self.write_all(b" ")?;
+                }
+
+                match scalar.style {
+                    ScalarStyle::SingleQuoted => {
+                        self.write_all(b"'")?;
+                        self.write_all(scalar.value.as_bytes())?;
+                        self.write_all(b"'")?;
+                    }
+                    ScalarStyle::DoubleQuoted => {
+                        self.write_all(b"\"")?;
+                        self.write_all(scalar.value.as_bytes())?;
+                        self.write_all(b"\"")?;
+                    }
+                    _ => {
+                        self.write_all(scalar.value.as_bytes())?;
+                    }
+                }
+
+                if !is_value && !is_key {
+                    self.write_all(b"\n")?;
+                    self.need_newline = false;
+                } else if is_value {
+                    self.need_newline = true;
+                } else if is_key {
+                    self.need_newline = false;
+                }
+
+                self.increment_parent();
             }
-            _ => {}
+            Event::SequenceStart(seq) => {
+                let in_seq = matches!(
+                    self.stack.last(),
+                    Some(Context::Sequence { .. })
+                );
+                let is_value = self.is_mapping_value();
+                let inline = self.first_item_inline;
+
+                if self.first_item_inline {
+                    self.first_item_inline = false;
+                    if in_seq {
+                        self.write_all(b"- ")?;
+                    }
+                } else if in_seq {
+                    self.write_indent()?;
+                    self.write_all(b"- ")?;
+                } else if is_value {
+                    self.write_all(b":")?;
+                }
+
+                if let Some(ref tag) = seq.tag {
+                    if !is_value && !in_seq && !inline {
+                        if self.need_newline {
+                            self.write_all(b"\n")?;
+                        }
+                        self.write_indent()?;
+                    }
+                    self.write_all(tag.as_bytes())?;
+                    self.write_all(b"\n")?;
+                    self.need_newline = false;
+                    self.first_item_inline = false;
+                } else if is_value {
+                    self.write_all(b"\n")?;
+                    self.need_newline = false;
+                    self.first_item_inline = false;
+                } else {
+                    self.first_item_inline = true;
+                }
+
+                self.increment_parent();
+                self.stack.push(Context::Sequence { items: 0 });
+            }
+            Event::SequenceEnd => {
+                let was_empty = matches!(
+                    self.stack.last(),
+                    Some(Context::Sequence { items: 0 })
+                );
+                self.stack.pop();
+
+                if was_empty {
+                    let is_key = self.is_mapping_key();
+                    let is_value = self.is_mapping_value();
+                    let in_seq = matches!(
+                        self.stack.last(),
+                        Some(Context::Sequence { .. })
+                    );
+
+                    if is_value {
+                        self.write_all(b": ")?;
+                    } else if is_key || in_seq {
+                        self.write_indent()?;
+                        if in_seq {
+                            self.write_all(b"- ")?;
+                        }
+                    }
+                    if !is_value && !is_key && !in_seq {
+                        self.write_indent()?;
+                    }
+                    self.write_all(b"[]\n")?;
+                    self.need_newline = false;
+                    self.increment_parent();
+                } else if self.need_newline {
+                    self.write_all(b"\n")?;
+                    self.need_newline = false;
+                }
+            }
+            Event::MappingStart(mapping) => {
+                let in_seq = matches!(
+                    self.stack.last(),
+                    Some(Context::Sequence { .. })
+                );
+                let is_value = self.is_mapping_value();
+                let inline = self.first_item_inline;
+
+                if self.first_item_inline {
+                    self.first_item_inline = false;
+                } else if in_seq {
+                    self.write_indent()?;
+                    self.write_all(b"- ")?;
+                } else if is_value {
+                    self.write_all(b":")?;
+                }
+
+                if let Some(ref tag) = mapping.tag {
+                    if !is_value && !in_seq && !inline {
+                        if self.need_newline {
+                            self.write_all(b"\n")?;
+                        }
+                        self.write_indent()?;
+                    }
+                    self.write_all(tag.as_bytes())?;
+                    self.write_all(b"\n")?;
+                    self.need_newline = false;
+                    self.first_item_inline = false;
+                } else if is_value {
+                    self.write_all(b"\n")?;
+                    self.need_newline = false;
+                    self.first_item_inline = false;
+                } else {
+                    self.first_item_inline = true;
+                }
+
+                self.increment_parent();
+                self.stack.push(Context::Mapping { entries: 0 });
+            }
+            Event::MappingEnd => {
+                let was_empty = matches!(
+                    self.stack.last(),
+                    Some(Context::Mapping { entries: 0 })
+                );
+                self.stack.pop();
+
+                if was_empty {
+                    let is_key = self.is_mapping_key();
+                    let is_value = self.is_mapping_value();
+                    let in_seq = matches!(
+                        self.stack.last(),
+                        Some(Context::Sequence { .. })
+                    );
+
+                    if is_value {
+                        self.write_all(b": ")?;
+                    } else if is_key || in_seq {
+                        self.write_indent()?;
+                        if in_seq {
+                            self.write_all(b"- ")?;
+                        }
+                    }
+                    if !is_value && !is_key && !in_seq {
+                        self.write_indent()?;
+                    }
+                    self.write_all(b"{}\n")?;
+                    self.need_newline = false;
+                    self.increment_parent();
+                } else if self.need_newline {
+                    self.write_all(b"\n")?;
+                    self.need_newline = false;
+                }
+            }
         }
 
         Ok(())
@@ -121,80 +373,11 @@ where
 
     /// Flushes the YAML emitter.
     pub fn flush(&mut self) -> Result<()> {
-        self.writer.flush().map_err(|e| Error {
-            problem: format!("IO error: {}", e),
-            problem_offset: 0,
-            problem_mark: Default::default(),
-            context: None,
-            context_mark: Default::default(),
-        })
+        self.writer.flush().map_err(Self::io_err)
     }
 
     /// Retrieves the inner writer from the YAML emitter.
     pub fn into_inner(self) -> W {
         self.writer
-    }
-}
-
-#[allow(dead_code)]
-fn events_to_yaml(events: &[Event<'_>], start: usize) -> Option<(Yaml, usize)> {
-    if start >= events.len() {
-        return None;
-    }
-
-    match &events[start] {
-        Event::Scalar(scalar) => {
-            let yaml = if scalar.value == "null" {
-                Yaml::Null
-            } else if scalar.value == "true" {
-                Yaml::Boolean(true)
-            } else if scalar.value == "false" {
-                Yaml::Boolean(false)
-            } else if let Ok(i) = scalar.value.parse::<i64>() {
-                Yaml::Integer(i)
-            } else if let Ok(f) = scalar.value.parse::<f64>() {
-                Yaml::Real(f.to_string())
-            } else {
-                Yaml::String(scalar.value.to_string())
-            };
-            Some((yaml, start + 1))
-        }
-        Event::SequenceStart(_) => {
-            let mut items = Vec::new();
-            let mut pos = start + 1;
-            while pos < events.len() {
-                if matches!(events[pos], Event::SequenceEnd) {
-                    return Some((Yaml::Array(items), pos + 1));
-                }
-                if let Some((yaml, next_pos)) = events_to_yaml(events, pos) {
-                    items.push(yaml);
-                    pos = next_pos;
-                } else {
-                    pos += 1;
-                }
-            }
-            Some((Yaml::Array(items), pos))
-        }
-        Event::MappingStart(_) => {
-            let mut map = LinkedHashMap::new();
-            let mut pos = start + 1;
-            while pos < events.len() {
-                if matches!(events[pos], Event::MappingEnd) {
-                    return Some((Yaml::Hash(map), pos + 1));
-                }
-                if let Some((key_yaml, next_pos)) = events_to_yaml(events, pos) {
-                    if let Some((val_yaml, final_pos)) = events_to_yaml(events, next_pos) {
-                        map.insert(key_yaml, val_yaml);
-                        pos = final_pos;
-                    } else {
-                        pos = next_pos;
-                    }
-                } else {
-                    pos += 1;
-                }
-            }
-            Some((Yaml::Hash(map), pos))
-        }
-        _ => None,
     }
 }

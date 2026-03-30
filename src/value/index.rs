@@ -1,5 +1,5 @@
 use crate::mapping::Entry;
-use crate::{mapping, private, Mapping, Value};
+use crate::{Mapping, Value, mapping, private};
 use std::fmt::{self, Debug};
 use std::ops;
 

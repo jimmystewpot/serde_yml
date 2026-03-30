@@ -3,8 +3,8 @@
 mod tests {
     use serde::{Deserialize, Serialize};
     use serde_yml::{
-        from_reader, from_slice, from_str, to_string, Mapping, Number,
-        Result, Sequence, Value,
+        Mapping, Number, Result, Sequence, Value, from_reader,
+        from_slice, from_str, to_string,
     };
     use std::io::Cursor;
 

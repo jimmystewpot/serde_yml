@@ -25,7 +25,9 @@ struct MyStruct {
 
 pub(crate) fn main() {
     // Print a message to indicate the file being executed.
-    println!("\n❯ Executing examples/with/singleton_map_recursive_serialize_deserialize.rs");
+    println!(
+        "\n❯ Executing examples/with/singleton_map_recursive_serialize_deserialize.rs"
+    );
 
     let input = MyStruct {
         field: MyEnum::Variant2 { field: 42 },

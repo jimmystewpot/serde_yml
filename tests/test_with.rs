@@ -129,7 +129,8 @@ mod tests {
 
         // Test serialization for OuterEnum::Variant1(InnerEnum::Variant1)
         let value = OuterEnum::Variant1(InnerEnum::Variant1);
-        let mut serializer = serde_yml::Serializer::new(Vec::new());
+        let mut serializer =
+            serde_yml::Serializer::new(Vec::new()).unwrap();
         nested_singleton_map::serialize(&value, &mut serializer)
             .unwrap();
         let yaml = String::from_utf8(serializer.into_inner().unwrap())
@@ -140,7 +141,8 @@ mod tests {
         let value = OuterEnum::Variant2 {
             inner: InnerEnum::Variant2("value".to_string()),
         };
-        let mut serializer = serde_yml::Serializer::new(Vec::new());
+        let mut serializer =
+            serde_yml::Serializer::new(Vec::new()).unwrap();
         nested_singleton_map::serialize(&value, &mut serializer)
             .unwrap();
         let yaml = String::from_utf8(serializer.into_inner().unwrap())
@@ -222,7 +224,8 @@ mod tests {
     fn test_singleton_map_recursive_top_level() {
         // Test serialization and deserialization for MyEnum::Unit
         let value = MyEnum::Unit;
-        let mut serializer = serde_yml::Serializer::new(Vec::new());
+        let mut serializer =
+            serde_yml::Serializer::new(Vec::new()).unwrap();
         singleton_map_recursive::serialize(&value, &mut serializer)
             .unwrap();
         let yaml = String::from_utf8(serializer.into_inner().unwrap())
@@ -242,28 +245,32 @@ mod tests {
     fn test_singleton_map_serialization() {
         // Test serialization for each variant of MyEnum
         let value = MyEnum::Unit;
-        let mut serializer = serde_yml::Serializer::new(Vec::new());
+        let mut serializer =
+            serde_yml::Serializer::new(Vec::new()).unwrap();
         singleton_map::serialize(&value, &mut serializer).unwrap();
         let yaml = String::from_utf8(serializer.into_inner().unwrap())
             .unwrap();
         assert_eq!(yaml, "Unit\n");
 
         let value = MyEnum::Newtype(42);
-        let mut serializer = serde_yml::Serializer::new(Vec::new());
+        let mut serializer =
+            serde_yml::Serializer::new(Vec::new()).unwrap();
         singleton_map::serialize(&value, &mut serializer).unwrap();
         let yaml = String::from_utf8(serializer.into_inner().unwrap())
             .unwrap();
         assert_eq!(yaml, "Newtype: 42\n");
 
         let value = MyEnum::Tuple(1, 2);
-        let mut serializer = serde_yml::Serializer::new(Vec::new());
+        let mut serializer =
+            serde_yml::Serializer::new(Vec::new()).unwrap();
         singleton_map::serialize(&value, &mut serializer).unwrap();
         let yaml = String::from_utf8(serializer.into_inner().unwrap())
             .unwrap();
         assert_eq!(yaml, "Tuple:\n- 1\n- 2\n");
 
         let value = MyEnum::Struct { value: 42 };
-        let mut serializer = serde_yml::Serializer::new(Vec::new());
+        let mut serializer =
+            serde_yml::Serializer::new(Vec::new()).unwrap();
         singleton_map::serialize(&value, &mut serializer).unwrap();
         let yaml = String::from_utf8(serializer.into_inner().unwrap())
             .unwrap();
@@ -308,7 +315,8 @@ mod tests {
     fn test_singleton_map_optional_serialization() {
         // Test serialization for Some(MyEnum::Unit) and None
         let value = Some(MyEnum::Unit);
-        let mut serializer = serde_yml::Serializer::new(Vec::new());
+        let mut serializer =
+            serde_yml::Serializer::new(Vec::new()).unwrap();
         singleton_map_optional::serialize(&value, &mut serializer)
             .unwrap();
         let yaml = String::from_utf8(serializer.into_inner().unwrap())
@@ -316,7 +324,8 @@ mod tests {
         assert_eq!(yaml, "Unit\n");
 
         let value: Option<MyEnum> = None;
-        let mut serializer = serde_yml::Serializer::new(Vec::new());
+        let mut serializer =
+            serde_yml::Serializer::new(Vec::new()).unwrap();
         singleton_map_optional::serialize(&value, &mut serializer)
             .unwrap();
         let yaml = String::from_utf8(serializer.into_inner().unwrap())
@@ -350,7 +359,8 @@ mod tests {
     fn test_singleton_map_with_serialization() {
         // Test serialization for MyEnum::Unit
         let value = MyEnum::Unit;
-        let mut serializer = serde_yml::Serializer::new(Vec::new());
+        let mut serializer =
+            serde_yml::Serializer::new(Vec::new()).unwrap();
         singleton_map_with::serialize(&value, &mut serializer).unwrap();
         let yaml = String::from_utf8(serializer.into_inner().unwrap())
             .unwrap();
@@ -380,7 +390,8 @@ mod tests {
 
         // Test serialization for NestedEnum::Variant(MyEnum::Unit)
         let value = NestedEnum::Variant(MyEnum::Unit);
-        let mut serializer = serde_yml::Serializer::new(Vec::new());
+        let mut serializer =
+            serde_yml::Serializer::new(Vec::new()).unwrap();
         singleton_map_recursive::serialize(&value, &mut serializer)
             .unwrap();
         let yaml = String::from_utf8(serializer.into_inner().unwrap())
@@ -412,7 +423,8 @@ mod tests {
     fn test_singleton_map_recursive_top_level_serialization() {
         // Test serialization for MyEnum::Unit
         let value = MyEnum::Unit;
-        let mut serializer = serde_yml::Serializer::new(Vec::new());
+        let mut serializer =
+            serde_yml::Serializer::new(Vec::new()).unwrap();
         singleton_map_recursive::serialize(&value, &mut serializer)
             .unwrap();
         let yaml = String::from_utf8(serializer.into_inner().unwrap())
@@ -464,7 +476,8 @@ mod tests {
 
         // Test serialization and deserialization of the single-variant enum
         let value = SingleVariantEnum::Variant;
-        let mut serializer = serde_yml::Serializer::new(Vec::new());
+        let mut serializer =
+            serde_yml::Serializer::new(Vec::new()).unwrap();
         singleton_map::serialize(&value, &mut serializer).unwrap();
         let yaml = String::from_utf8(serializer.into_inner().unwrap())
             .unwrap();
@@ -487,7 +500,8 @@ mod tests {
 
         // Test serialization and deserialization of the generic enum
         let value = GenericEnum::Variant(42);
-        let mut serializer = serde_yml::Serializer::new(Vec::new());
+        let mut serializer =
+            serde_yml::Serializer::new(Vec::new()).unwrap();
         singleton_map::serialize(&value, &mut serializer).unwrap();
         let yaml = String::from_utf8(serializer.into_inner().unwrap())
             .unwrap();

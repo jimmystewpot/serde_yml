@@ -11,8 +11,8 @@ pub mod tagged;
 
 use crate::modules::error::{self, Error, ErrorImpl};
 use serde::{
-    de::{Deserialize, DeserializeOwned, IntoDeserializer},
     Serialize,
+    de::{Deserialize, DeserializeOwned, IntoDeserializer},
 };
 use std::{
     hash::{Hash, Hasher},

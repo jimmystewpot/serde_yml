@@ -1,6 +1,6 @@
-use crate::value::tagged::{self, TagStringVisitor};
 use crate::value::TaggedValue;
-use crate::{number, Error, Mapping, Sequence, Value};
+use crate::value::tagged::{self, TagStringVisitor};
+use crate::{Error, Mapping, Sequence, Value, number};
 use serde::de::value::{BorrowedStrDeserializer, StrDeserializer};
 use serde::de::value::{MapAccessDeserializer, SeqAccessDeserializer};
 use serde::de::{

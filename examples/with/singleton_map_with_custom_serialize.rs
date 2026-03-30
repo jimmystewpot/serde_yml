@@ -36,7 +36,9 @@ struct MyStruct {
 }
 
 pub(crate) fn main() {
-    println!("\n❯ Executing examples/with/singleton_map_with_custom_serialize.rs");
+    println!(
+        "\n❯ Executing examples/with/singleton_map_with_custom_serialize.rs"
+    );
 
     let input = MyStruct {
         field: MyEnum::Variant2 { field: 42 },

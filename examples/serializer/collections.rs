@@ -6,7 +6,7 @@
 //! crate.
 //!
 
-use serde_yml::{to_string, Result};
+use serde_yml::{Result, to_string};
 use std::collections::HashMap;
 
 pub(crate) fn main() -> Result<()> {
