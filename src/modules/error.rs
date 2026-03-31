@@ -115,16 +115,13 @@ pub(crate) fn fix_mark(
     mark: libyml_error::Mark,
     path: &crate::modules::path::Path<'_>,
 ) -> Error {
-    match err.0.as_mut() {
-        ErrorImpl::Message(_, pos) => {
-            if pos.is_none() {
-                *pos = Some(Pos {
-                    mark,
-                    path: path.to_string(),
-                });
-            }
-        }
-        _ => {}
+    if let ErrorImpl::Message(_, pos) = err.0.as_mut()
+        && pos.is_none()
+    {
+        *pos = Some(Pos {
+            mark,
+            path: path.to_string(),
+        });
     }
     err
 }

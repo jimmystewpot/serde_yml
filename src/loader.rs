@@ -108,8 +108,7 @@ impl<'input> Loader<'input> {
                     Ok(0) => {} // EOF reached
                     Ok(_) => {
                         return Err(error::new(ErrorImpl::IoError(
-                            std::io::Error::new(
-                                std::io::ErrorKind::Other,
+                            std::io::Error::other(
                                 "input too large (max 128MB)",
                             ),
                         )));

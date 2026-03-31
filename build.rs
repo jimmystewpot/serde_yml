@@ -16,9 +16,9 @@ use std::process;
 /// # Returns
 ///
 /// * `Some(true)` - If the current Rustc version is at least the minimum
-///    required version.
+///   required version.
 /// * `Some(false)` - If the current Rustc version is less than the minimum
-///    required version.
+///   required version.
 /// * `None` - If the current Rustc version cannot be determined.
 ///
 /// # Errors
@@ -49,7 +49,10 @@ fn main() {
     match version_check::is_min_version(min_version) {
         Some(true) => {}
         _ => {
-            println!("cargo:warning='fd' requires Rustc version >= {}", min_version);
+            println!(
+                "cargo:warning='fd' requires Rustc version >= {}",
+                min_version
+            );
             process::exit(1);
         }
     }

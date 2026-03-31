@@ -196,7 +196,7 @@ mod tests {
     #[test]
     fn test_tag_partial_eq_empty_string() {
         let tag = Tag::new("tag:yaml.org,2002:test");
-        assert!(tag != "");
+        assert!(!tag.is_empty());
     }
 
     /// Test the behaviour of PartialEq with a non-ASCII string

@@ -119,7 +119,7 @@ mod tests {
     fn test_from_iterator() {
         // Verify conversion from iterator to Value
         // Given an iterator that repeats a value,
-        let v = std::iter::repeat(42).take(5);
+        let v = std::iter::repeat_n(42, 5);
         // When collecting it into Value,
         let x: Value = v.collect();
         // Then it should be converted correctly.

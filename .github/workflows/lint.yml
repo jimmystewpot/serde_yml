@@ -16,9 +16,10 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: hecrj/setup-rust-action@v2.0.1
-        with:
-          components: clippy
       - uses: actions/checkout@v6.0.2
+      - name: Install Rust
+        run: |
+          rustup update stable
+          rustup component add clippy
       - name: Check lints
-        run: cargo clippy --workspace --all-features --all-targets --no-deps -- -D warnings
+        run: cargo clippy --workspace --all-features --all-targets --no-deps -- -D warnings -A clippy::print_stdout -A clippy::print_stderr

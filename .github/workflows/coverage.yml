@@ -13,49 +13,23 @@ jobs:
   coverage:
     name: Code Coverage
     runs-on: ubuntu-latest
-    env:
-      CARGO_INCREMENTAL: "0"
-      RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests"
-      RUSTDOCFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests"
 
     steps:
-      # Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v6.0.2
 
-      # Setup Rust nightly
       - name: Install Rust
-        uses: actions-rs/toolchain@v1.0.7
-        id: toolchain
-        with:
-          toolchain: nightly
-          override: true
+        run: rustup update stable
 
-      # Configure cache for Cargo
-      - name: Cache Cargo registry, index
-        uses: actions/cache@v5.0.4
-        id: cache-cargo
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/bin
-            ~/.cargo/git
-          key: linux-${{ steps.toolchain.outputs.rustc_hash }}-rust-cov-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
 
-      # Run tests with all features
-      - name: Test (cargo test)
-        uses: actions-rs/cargo@v1.0.3
-        with:
-          command: test
-          args: "--workspace"
+      - name: Generate code coverage
+        run: cargo llvm-cov --all-features --workspace --codecov --output-path codecov.json
 
-      # Install grcov
-      - uses: actions-rs/grcov@v0.1
-        id: coverage
-
-      # Upload to Codecov.io
       - name: Upload to Codecov.io
         uses: codecov/codecov-action@v6.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          file: ${{ steps.coverage.outputs.report }}
+          files: codecov.json
+          fail_ci_if_error: true
