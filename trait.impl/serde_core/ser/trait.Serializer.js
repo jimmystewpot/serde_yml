@@ -1,0 +1,9 @@
+(function() {
+    const implementors = Object.fromEntries([["serde_yml",[["impl <a class=\"trait\" href=\"https://docs.rs/serde_core/1.0.228/serde_core/ser/trait.Serializer.html\" title=\"trait serde_core::ser::Serializer\">Serializer</a> for <a class=\"struct\" href=\"serde_yml/value/struct.Serializer.html\" title=\"struct serde_yml::value::Serializer\">Serializer</a>",0],["impl&lt;'a, W&gt; <a class=\"trait\" href=\"https://docs.rs/serde_core/1.0.228/serde_core/ser/trait.Serializer.html\" title=\"trait serde_core::ser::Serializer\">Serializer</a> for &amp;mut <a class=\"struct\" href=\"serde_yml/ser/struct.Serializer.html\" title=\"struct serde_yml::ser::Serializer\">Serializer</a>&lt;'a, W&gt;<div class=\"where\">where\n    W: <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/std/io/trait.Write.html\" title=\"trait std::io::Write\">Write</a> + 'a,</div>",0],["impl&lt;D&gt; <a class=\"trait\" href=\"https://docs.rs/serde_core/1.0.228/serde_core/ser/trait.Serializer.html\" title=\"trait serde_core::ser::Serializer\">Serializer</a> for <a class=\"struct\" href=\"serde_yml/with/singleton_map/struct.SingletonMap.html\" title=\"struct serde_yml::with::singleton_map::SingletonMap\">SingletonMap</a>&lt;D&gt;<div class=\"where\">where\n    D: <a class=\"trait\" href=\"https://docs.rs/serde_core/1.0.228/serde_core/ser/trait.Serializer.html\" title=\"trait serde_core::ser::Serializer\">Serializer</a>,</div>",0]]]]);
+    if (window.register_implementors) {
+        window.register_implementors(implementors);
+    } else {
+        window.pending_implementors = implementors;
+    }
+})()
+//{"start":59,"fragment_lengths":[1379]}
