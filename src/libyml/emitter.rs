@@ -4,154 +4,112 @@ use std::io;
 
 /// Context for tracking nesting in the emitter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(variant_size_differences)]
 enum Context {
-    /// Inside a sequence, tracks how many items have been emitted.
-    Sequence { items: usize },
-    /// Inside a mapping, tracks how many scalars have been emitted (key/value pairs).
-    Mapping { entries: usize },
+    /// Inside a sequence, tracks index.
+    Sequence { index: usize },
+    /// Inside a mapping, tracks whether next event is key or value.
+    Mapping { is_key: bool },
 }
 
-/// A YAML emitter.
+/// A YAML emitter that writes events to a writer.
 pub struct Emitter<'a, W> {
     writer: W,
-    _phantom: std::marker::PhantomData<&'a ()>,
     stack: Vec<Context>,
     need_newline: bool,
     first_item_inline: bool,
+    _marker: std::marker::PhantomData<&'a ()>,
 }
 
-impl<W> Debug for Emitter<'_, W> {
+impl<W> Debug for Emitter<'_, W>
+where
+    W: Debug,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Emitter").finish()
+        f.debug_struct("Emitter")
+            .field("writer", &self.writer)
+            .field("stack", &self.stack)
+            .field("need_newline", &self.need_newline)
+            .field("first_item_inline", &self.first_item_inline)
+            .finish()
     }
 }
 
-/// YAML event types.
-#[derive(Debug, Clone)]
-pub enum Event<'a> {
-    /// Start of a YAML stream.
-    StreamStart,
-    /// End of a YAML stream.
-    StreamEnd,
-    /// Start of a YAML document.
-    DocumentStart,
-    /// End of a YAML document.
-    DocumentEnd,
-    /// Scalar value.
-    Scalar(Scalar<'a>),
-    /// Start of a sequence.
-    SequenceStart(Sequence),
-    /// End of a sequence.
-    SequenceEnd,
-    /// Start of a mapping.
-    MappingStart(Mapping),
-    /// End of a mapping.
-    MappingEnd,
-}
-
-/// Represents a scalar value in YAML.
-#[derive(Debug, Clone)]
+/// Represents a YAML scalar.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Scalar<'a> {
-    /// Optional tag for the scalar.
+    /// The optional tag of the scalar.
     pub tag: Option<String>,
-    /// Value of the scalar.
+    /// The value of the scalar.
     pub value: &'a str,
-    /// Style of the scalar.
+    /// The style of the scalar.
     pub style: ScalarStyle,
 }
 
-/// Styles for YAML scalars.
-#[derive(Clone, Copy, Debug)]
+/// Represents the style of a YAML scalar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScalarStyle {
-    /// Any scalar style.
-    Any,
-    /// Double quoted scalar style.
-    DoubleQuoted,
-    /// Folded scalar style.
-    Folded,
     /// Plain scalar style.
     Plain,
-    /// Single quoted scalar style.
+    /// Single-quoted scalar style.
     SingleQuoted,
+    /// Double-quoted scalar style.
+    DoubleQuoted,
     /// Literal scalar style.
     Literal,
+    /// Folded scalar style.
+    Folded,
 }
 
 /// Represents a YAML sequence.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Sequence {
-    /// Optional tag for the sequence.
+    /// The optional tag of the sequence.
     pub tag: Option<String>,
 }
 
 /// Represents a YAML mapping.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Mapping {
-    /// Optional tag for the mapping.
+    /// The optional tag of the mapping.
     pub tag: Option<String>,
 }
 
-impl<'a, W> Emitter<'a, W>
+/// Represents a YAML event.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Event<'a> {
+    /// Indicates the start of a YAML stream.
+    StreamStart,
+    /// Indicates the end of a YAML stream.
+    StreamEnd,
+    /// Indicates the start of a YAML document.
+    DocumentStart,
+    /// Indicates the end of a YAML document.
+    DocumentEnd,
+    /// Indicates a YAML scalar.
+    Scalar(Scalar<'a>),
+    /// Indicates the start of a YAML sequence.
+    SequenceStart(Sequence),
+    /// Indicates the end of a YAML sequence.
+    SequenceEnd,
+    /// Indicates the start of a YAML mapping.
+    MappingStart(Mapping),
+    /// Indicates the end of a YAML mapping.
+    MappingEnd,
+}
+
+impl<W> Emitter<'_, W>
 where
     W: io::Write,
 {
     /// Creates a new YAML emitter.
-    pub fn new(write: W) -> Emitter<'a, W> {
+    pub fn new(writer: W) -> Self {
         Emitter {
-            writer: write,
-            _phantom: std::marker::PhantomData,
+            writer,
             stack: Vec::new(),
             need_newline: false,
             first_item_inline: false,
-        }
-    }
-
-    fn io_err(e: io::Error) -> Error {
-        Error {
-            problem: format!("IO error: {}", e),
-            problem_offset: 0,
-            problem_mark: Default::default(),
-            context: None,
-            context_mark: Default::default(),
-        }
-    }
-
-    fn write_all(&mut self, buf: &[u8]) -> Result<()> {
-        self.writer.write_all(buf).map_err(Self::io_err)
-    }
-
-    fn indent_depth(&self) -> usize {
-        let mut depth = 0;
-        for ctx in &self.stack {
-            match ctx {
-                Context::Mapping { .. } => depth += 1,
-                Context::Sequence { .. } => depth += 1,
-            }
-        }
-        if depth > 0 { depth - 1 } else { 0 }
-    }
-
-    fn write_indent(&mut self) -> Result<()> {
-        let depth = self.indent_depth();
-        for _ in 0..depth {
-            self.write_all(b"  ")?;
-        }
-        Ok(())
-    }
-
-    fn is_mapping_key(&self) -> bool {
-        matches!(self.stack.last(), Some(Context::Mapping { entries }) if entries % 2 == 0)
-    }
-
-    fn is_mapping_value(&self) -> bool {
-        matches!(self.stack.last(), Some(Context::Mapping { entries }) if entries % 2 == 1)
-    }
-
-    fn increment_parent(&mut self) {
-        match self.stack.last_mut() {
-            Some(Context::Sequence { items }) => *items += 1,
-            Some(Context::Mapping { entries }) => *entries += 1,
-            None => {}
+            _marker: std::marker::PhantomData,
         }
     }
 
@@ -159,7 +117,16 @@ where
     pub fn emit(&mut self, event: Event<'_>) -> Result<()> {
         match event {
             Event::StreamStart | Event::StreamEnd => {}
-            Event::DocumentStart | Event::DocumentEnd => {}
+            Event::DocumentStart => {
+                if self.need_newline {
+                    self.write_all(b"\n")?;
+                }
+                self.write_all(b"---\n")?;
+                self.need_newline = false;
+            }
+            Event::DocumentEnd => {
+                self.need_newline = true;
+            }
             Event::Scalar(scalar) => {
                 let in_seq = matches!(
                     self.stack.last(),
@@ -183,6 +150,8 @@ where
                     self.write_indent()?;
                 } else if is_value {
                     self.write_all(b": ")?;
+                } else if self.need_newline {
+                    self.write_all(b"\n")?;
                 }
 
                 if let Some(ref tag) = scalar.tag {
@@ -198,21 +167,67 @@ where
                     }
                     ScalarStyle::DoubleQuoted => {
                         self.write_all(b"\"")?;
-                        self.write_all(scalar.value.as_bytes())?;
+                        for c in scalar.value.chars() {
+                            match c {
+                                '"' => self.write_all(b"\\\"")?,
+                                '\\' => self.write_all(b"\\\\")?,
+                                '\n' => self.write_all(b"\\n")?,
+                                '\r' => self.write_all(b"\\r")?,
+                                '\t' => self.write_all(b"\\t")?,
+                                _ => {
+                                    let mut b = [0u8; 4];
+                                    self.write_all(c.encode_utf8(&mut b).as_bytes())?;
+                                }
+                            }
+                        }
                         self.write_all(b"\"")?;
+                    }
+                    ScalarStyle::Literal => {
+                        self.write_all(b"|-\n")?;
+                        let depth = self.indent_depth() + 1;
+                        let mut lines = scalar.value.lines().peekable();
+                        while let Some(line) = lines.next() {
+                            for _ in 0..depth {
+                                self.write_all(b"  ")?;
+                            }
+                            self.write_all(line.as_bytes())?;
+                            if lines.peek().is_some() || scalar.value.ends_with('\n') {
+                                self.write_all(b"\n")?;
+                            }
+                        }
+                    }
+                    ScalarStyle::Folded => {
+                        self.write_all(b">-\n")?;
+                        let depth = self.indent_depth() + 1;
+                        let mut lines = scalar.value.lines().peekable();
+                        while let Some(line) = lines.next() {
+                            if line.is_empty() {
+                                self.write_all(b"\n")?;
+                            } else {
+                                for _ in 0..depth {
+                                    self.write_all(b"  ")?;
+                                }
+                                self.write_all(line.as_bytes())?;
+                                if lines.peek().is_some() || scalar.value.ends_with('\n') {
+                                    self.write_all(b"\n")?;
+                                }
+                            }
+                        }
                     }
                     _ => {
                         self.write_all(scalar.value.as_bytes())?;
                     }
                 }
 
-                if !is_value && !is_key {
-                    self.write_all(b"\n")?;
-                    self.need_newline = false;
-                } else if is_value {
+                if is_value {
                     self.need_newline = true;
                 } else if is_key {
                     self.need_newline = false;
+                } else if !matches!(scalar.style, ScalarStyle::Literal | ScalarStyle::Folded) {
+                    self.write_all(b"\n")?;
+                    self.need_newline = false;
+                } else {
+                    self.need_newline = true;
                 }
 
                 self.increment_parent();
@@ -223,7 +238,6 @@ where
                     Some(Context::Sequence { .. })
                 );
                 let is_value = self.is_mapping_value();
-                let inline = self.first_item_inline;
 
                 if self.first_item_inline {
                     self.first_item_inline = false;
@@ -234,64 +248,23 @@ where
                     self.write_indent()?;
                     self.write_all(b"- ")?;
                 } else if is_value {
-                    self.write_all(b":")?;
+                    self.write_all(b": ")?;
+                } else if self.need_newline {
+                    self.write_all(b"\n")?;
                 }
 
                 if let Some(ref tag) = seq.tag {
-                    if !is_value && !in_seq && !inline {
-                        if self.need_newline {
-                            self.write_all(b"\n")?;
-                        }
-                        self.write_indent()?;
-                    }
                     self.write_all(tag.as_bytes())?;
                     self.write_all(b"\n")?;
                     self.need_newline = false;
-                    self.first_item_inline = false;
-                } else if is_value {
-                    self.write_all(b"\n")?;
-                    self.need_newline = false;
-                    self.first_item_inline = false;
-                } else {
-                    self.first_item_inline = true;
                 }
 
-                self.increment_parent();
-                self.stack.push(Context::Sequence { items: 0 });
+                self.stack.push(Context::Sequence { index: 0 });
             }
             Event::SequenceEnd => {
-                let was_empty = matches!(
-                    self.stack.last(),
-                    Some(Context::Sequence { items: 0 })
-                );
                 self.stack.pop();
-
-                if was_empty {
-                    let is_key = self.is_mapping_key();
-                    let is_value = self.is_mapping_value();
-                    let in_seq = matches!(
-                        self.stack.last(),
-                        Some(Context::Sequence { .. })
-                    );
-
-                    if is_value {
-                        self.write_all(b": ")?;
-                    } else if is_key || in_seq {
-                        self.write_indent()?;
-                        if in_seq {
-                            self.write_all(b"- ")?;
-                        }
-                    }
-                    if !is_value && !is_key && !in_seq {
-                        self.write_indent()?;
-                    }
-                    self.write_all(b"[]\n")?;
-                    self.need_newline = false;
-                    self.increment_parent();
-                } else if self.need_newline {
-                    self.write_all(b"\n")?;
-                    self.need_newline = false;
-                }
+                self.need_newline = true;
+                self.increment_parent();
             }
             Event::MappingStart(mapping) => {
                 let in_seq = matches!(
@@ -299,79 +272,81 @@ where
                     Some(Context::Sequence { .. })
                 );
                 let is_value = self.is_mapping_value();
-                let inline = self.first_item_inline;
 
                 if self.first_item_inline {
                     self.first_item_inline = false;
+                    if in_seq {
+                        self.write_all(b"- ")?;
+                    }
                 } else if in_seq {
                     self.write_indent()?;
                     self.write_all(b"- ")?;
                 } else if is_value {
-                    self.write_all(b":")?;
+                    self.write_all(b": ")?;
+                } else if self.need_newline {
+                    self.write_all(b"\n")?;
                 }
 
                 if let Some(ref tag) = mapping.tag {
-                    if !is_value && !in_seq && !inline {
-                        if self.need_newline {
-                            self.write_all(b"\n")?;
-                        }
-                        self.write_indent()?;
-                    }
                     self.write_all(tag.as_bytes())?;
                     self.write_all(b"\n")?;
                     self.need_newline = false;
-                    self.first_item_inline = false;
                 } else if is_value {
                     self.write_all(b"\n")?;
                     self.need_newline = false;
-                    self.first_item_inline = false;
                 } else {
                     self.first_item_inline = true;
                 }
 
-                self.increment_parent();
-                self.stack.push(Context::Mapping { entries: 0 });
+                self.stack.push(Context::Mapping { is_key: true });
             }
             Event::MappingEnd => {
-                let was_empty = matches!(
-                    self.stack.last(),
-                    Some(Context::Mapping { entries: 0 })
-                );
                 self.stack.pop();
-
-                if was_empty {
-                    let is_key = self.is_mapping_key();
-                    let is_value = self.is_mapping_value();
-                    let in_seq = matches!(
-                        self.stack.last(),
-                        Some(Context::Sequence { .. })
-                    );
-
-                    if is_value {
-                        self.write_all(b": ")?;
-                    } else if is_key || in_seq {
-                        self.write_indent()?;
-                        if in_seq {
-                            self.write_all(b"- ")?;
-                        }
-                    }
-                    if !is_value && !is_key && !in_seq {
-                        self.write_indent()?;
-                    }
-                    self.write_all(b"{}\n")?;
-                    self.need_newline = false;
-                    self.increment_parent();
-                } else if self.need_newline {
-                    self.write_all(b"\n")?;
-                    self.need_newline = false;
-                }
+                self.need_newline = true;
+                self.increment_parent();
             }
         }
-
         Ok(())
     }
 
-    /// Flushes the YAML emitter.
+    fn write_all(&mut self, data: &[u8]) -> Result<()> {
+        self.writer.write_all(data).map_err(Self::io_err)
+    }
+
+    fn write_indent(&mut self) -> Result<()> {
+        let depth = self.indent_depth();
+        for _ in 0..depth {
+            self.write_all(b"  ")?;
+        }
+        Ok(())
+    }
+
+    fn indent_depth(&self) -> usize {
+        self.stack.len()
+    }
+
+    fn is_mapping_key(&self) -> bool {
+        matches!(self.stack.last(), Some(Context::Mapping { is_key: true }))
+    }
+
+    fn is_mapping_value(&self) -> bool {
+        matches!(self.stack.last(), Some(Context::Mapping { is_key: false }))
+    }
+
+    fn increment_parent(&mut self) {
+        if let Some(ctx) = self.stack.last_mut() {
+            match ctx {
+                Context::Sequence { index } => *index += 1,
+                Context::Mapping { is_key } => *is_key = !*is_key,
+            }
+        }
+    }
+
+    fn io_err(err: io::Error) -> Error {
+        Error::new(err.to_string())
+    }
+
+    /// Flushes the underlying writer of the YAML emitter.
     pub fn flush(&mut self) -> Result<()> {
         self.writer.flush().map_err(Self::io_err)
     }

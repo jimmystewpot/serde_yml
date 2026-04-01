@@ -23,6 +23,17 @@ pub struct Error {
 }
 
 impl Error {
+    /// Creates a new `Error` with the specified problem description.
+    pub fn new(problem: String) -> Self {
+        Error {
+            problem,
+            problem_offset: 0,
+            problem_mark: Mark::default(),
+            context: None,
+            context_mark: Mark::default(),
+        }
+    }
+
     /// Returns the mark indicating the position of the problem that caused the error.
     pub fn mark(&self) -> Mark {
         self.problem_mark

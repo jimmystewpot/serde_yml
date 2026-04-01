@@ -114,7 +114,7 @@ mod tests {
         let document = deserializer.next().unwrap();
         let anchors = document.anchors().unwrap_or_default();
         let expected = DocumentAnchor {
-            anchor_name: "io".into(),
+            anchor_name: "1".into(),
             anchor_path: "/a/enum".into(),
             aliases: ["/b/enum".into(), "/c/enum".into()].to_vec(),
         };
@@ -131,7 +131,7 @@ mod tests {
         - \"double quoted\"
     "};
         let expected =
-            vec!["plain nonàscii", "single quoted", "double quoted"];
+            vec!["plain nonàscii".to_owned(), "single quoted".to_owned(), "double quoted".to_owned()];
         test_de_no_value(yaml, &expected);
     }
 

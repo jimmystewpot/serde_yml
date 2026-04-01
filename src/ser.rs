@@ -39,6 +39,8 @@ pub struct Serializer<'a, W> {
     pub state: State,
     /// The YAML emitter.
     pub emitter: Emitter<'a, W>,
+    /// Whether this is the first document in the stream.
+    pub first_document: bool,
 }
 
 /// The configuration of the serializer.
@@ -92,6 +94,7 @@ where
             depth: 0,
             state: State::NothingInParticular,
             emitter,
+            first_document: true,
         })
     }
 
@@ -140,7 +143,9 @@ where
     /// Emit a sequence end.
     pub fn emit_sequence_end(&mut self) -> Result<()> {
         self.emitter.emit(Event::SequenceEnd).map_err(Error::from)?;
-        self.depth -= 1;
+        if self.depth > 0 {
+            self.depth -= 1;
+        }
         self.value_end()
     }
 
@@ -159,12 +164,22 @@ where
     /// Emit a mapping end.
     pub fn emit_mapping_end(&mut self) -> Result<()> {
         self.emitter.emit(Event::MappingEnd).map_err(Error::from)?;
-        self.depth -= 1;
+        if self.depth > 0 {
+            self.depth -= 1;
+        }
         self.value_end()
     }
 
     /// Start of a value.
     pub fn value_start(&mut self) -> Result<()> {
+        if self.depth == 0 {
+            if !self.first_document {
+                self.emitter
+                    .emit(Event::DocumentStart)
+                    .map_err(Error::from)?;
+            }
+            self.first_document = false;
+        }
         Ok(())
     }
 
@@ -261,17 +276,53 @@ where
         })
     }
 
-    fn serialize_f32(self, v: f32) -> Result<()> {
-        self.serialize_f64(f64::from(v))
-    }
-
-    fn serialize_f64(self, v: f64) -> Result<()> {
-        let mut buffer = ryu::Buffer::new();
+    fn serialize_i128(self, v: i128) -> Result<()> {
+        let mut buffer = itoa::Buffer::new();
         self.emit_scalar(Scalar {
             tag: None,
             value: buffer.format(v),
             style: ScalarStyle::Plain,
         })
+    }
+
+    fn serialize_u128(self, v: u128) -> Result<()> {
+        let mut buffer = itoa::Buffer::new();
+        self.emit_scalar(Scalar {
+            tag: None,
+            value: buffer.format(v),
+            style: ScalarStyle::Plain,
+        })
+    }
+
+    fn serialize_f32(self, v: f32) -> Result<()> {
+        self.serialize_f64(f64::from(v))
+    }
+
+    fn serialize_f64(self, v: f64) -> Result<()> {
+        if v.is_infinite() {
+            self.emit_scalar(Scalar {
+                tag: None,
+                value: if v.is_sign_positive() {
+                    ".inf"
+                } else {
+                    "-.inf"
+                },
+                style: ScalarStyle::Plain,
+            })
+        } else if v.is_nan() {
+            self.emit_scalar(Scalar {
+                tag: None,
+                value: ".nan",
+                style: ScalarStyle::Plain,
+            })
+        } else {
+            let mut buffer = ryu::Buffer::new();
+            self.emit_scalar(Scalar {
+                tag: None,
+                value: buffer.format(v),
+                style: ScalarStyle::Plain,
+            })
+        }
     }
 
     fn serialize_char(self, v: char) -> Result<()> {
@@ -283,7 +334,9 @@ where
         self.emit_scalar(Scalar {
             tag: None,
             value: v,
-            style: if crate::de::ambiguous_string(v) {
+            style: if v.contains(['\n', '\r', '\t', '"', '\\']) {
+                ScalarStyle::DoubleQuoted
+            } else if crate::de::ambiguous_string(v) {
                 ScalarStyle::SingleQuoted
             } else {
                 ScalarStyle::Plain
@@ -329,12 +382,11 @@ where
         _variant_index: u32,
         variant: &'static str,
     ) -> Result<()> {
-        if self.config.tag_unit_variants {
-            self.state = State::FoundTag(format!("!{}", variant));
-            self.serialize_unit()
-        } else {
-            self.serialize_str(variant)
-        }
+        self.emit_scalar(Scalar {
+            tag: Some(format!("!{}", variant)),
+            value: "null",
+            style: ScalarStyle::Plain,
+        })
     }
 
     fn serialize_newtype_struct<T>(
@@ -358,10 +410,8 @@ where
     where
         T: ?Sized + ser::Serialize,
     {
-        self.emit_mapping_start()?;
-        self.serialize_str(variant)?;
-        value.serialize(&mut *self)?;
-        self.emit_mapping_end()
+        self.state = State::FoundTag(format!("!{}", variant));
+        value.serialize(self)
     }
 
     fn serialize_seq(
@@ -394,10 +444,8 @@ where
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant> {
-        self.emit_mapping_start()?;
-        self.serialize_str(variant)?;
-        self.emit_sequence_start()?;
-        Ok(self)
+        self.state = State::FoundTag(format!("!{}", variant));
+        self.serialize_seq(Some(_len))
     }
 
     fn serialize_map(
@@ -423,10 +471,8 @@ where
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStructVariant> {
-        self.emit_mapping_start()?;
-        self.serialize_str(variant)?;
-        self.emit_mapping_start()?;
-        Ok(self)
+        self.state = State::FoundTag(format!("!{}", variant));
+        self.serialize_map(Some(_len))
     }
 
     fn collect_str<T>(self, value: &T) -> Result<()>
@@ -510,8 +556,7 @@ where
     }
 
     fn end(self) -> Result<()> {
-        self.emit_sequence_end()?;
-        self.emit_mapping_end()
+        self.emit_sequence_end()
     }
 }
 

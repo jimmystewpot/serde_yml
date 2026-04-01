@@ -40,7 +40,7 @@ mod tests {
 
         let result =
             String::from_utf8_lossy(&buffer.into_inner()).to_string();
-        assert_eq!(result, "\n");
+        assert_eq!(result, "---\n\n");
     }
 
     #[test]
@@ -64,7 +64,7 @@ mod tests {
 
         let result =
             String::from_utf8_lossy(&buffer.into_inner()).to_string();
-        assert_eq!(result, "hello\n");
+        assert_eq!(result, "---\nhello\n");
     }
 
     #[test]
@@ -99,7 +99,7 @@ mod tests {
 
         let result =
             String::from_utf8_lossy(&buffer.into_inner()).to_string();
-        assert_eq!(result, "- item1\n- item2\n");
+        assert_eq!(result, "---\n- item1\n- item2\n");
     }
 
     #[test]
@@ -148,7 +148,7 @@ mod tests {
 
         let result =
             String::from_utf8_lossy(&buffer.into_inner()).to_string();
-        assert_eq!(result, "key1: value1\nkey2: value2\n");
+        assert_eq!(result, "---\nkey1: value1\nkey2: value2\n");
     }
 
     #[test]
@@ -173,7 +173,7 @@ mod tests {
 
         let result =
             String::from_utf8_lossy(&buffer.into_inner()).to_string();
-        assert_eq!(result, "hello\n");
+        assert_eq!(result, "---\nhello\n");
     }
 
     #[test]
@@ -197,7 +197,7 @@ mod tests {
 
         let result =
             String::from_utf8_lossy(&buffer.into_inner()).to_string();
-        assert_eq!(result, "!mytag hello\n");
+        assert_eq!(result, "---\n!mytag hello\n");
     }
 
     #[test]
@@ -234,7 +234,7 @@ mod tests {
 
         let result =
             String::from_utf8_lossy(&buffer.into_inner()).to_string();
-        assert_eq!(result, "!mytag\n- item1\n- item2\n");
+        assert_eq!(result, "---\n!mytag\n- item1\n- item2\n");
     }
 
     #[test]
@@ -285,7 +285,7 @@ mod tests {
 
         let result =
             String::from_utf8_lossy(&buffer.into_inner()).to_string();
-        assert_eq!(result, "!mytag\nkey1: value1\nkey2: value2\n");
+        assert_eq!(result, "---\n!mytag\nkey1: value1\nkey2: value2\n");
     }
 
     #[test]
@@ -306,7 +306,7 @@ mod tests {
 
         let result =
             String::from_utf8_lossy(&buffer.into_inner()).to_string();
-        assert_eq!(result, "[]\n");
+        assert_eq!(result, "---\n[]\n");
     }
 
     #[test]
@@ -327,7 +327,7 @@ mod tests {
 
         let result =
             String::from_utf8_lossy(&buffer.into_inner()).to_string();
-        assert_eq!(result, "{}\n");
+        assert_eq!(result, "---\n{}\n");
     }
 
     #[test]
@@ -359,7 +359,7 @@ mod tests {
 
         let result =
             String::from_utf8_lossy(&buffer.into_inner()).to_string();
-        assert_eq!(result, "- - nested\n");
+        assert_eq!(result, "---\n- - nested\n");
     }
 
     #[test]
@@ -405,6 +405,6 @@ mod tests {
 
         let result =
             String::from_utf8_lossy(&buffer.into_inner()).to_string();
-        assert_eq!(result, "key:\n  nested_key: nested_value\n");
+        assert_eq!(result, "---\nkey:\n  nested_key: nested_value\n");
     }
 }

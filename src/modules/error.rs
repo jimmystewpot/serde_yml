@@ -107,7 +107,7 @@ pub(crate) fn new(error: ErrorImpl) -> Error {
 }
 
 pub(crate) fn shared(error: Arc<ErrorImpl>) -> Error {
-    Error(Box::new(ErrorImpl::Message(format!("{:?}", error), None)))
+    Error(Box::new(ErrorImpl::Message(format!("{}", error), None)))
 }
 
 pub(crate) fn fix_mark(
@@ -235,7 +235,13 @@ impl ser::Error for Error {
 
 impl From<libyml_error::Error> for Error {
     fn from(err: libyml_error::Error) -> Self {
-        Error(Box::new(ErrorImpl::Libyml(err)))
+        if err.problem.contains("found unknown anchor") {
+            Error(Box::new(ErrorImpl::UnknownAnchor(err.problem_mark)))
+        } else if err.problem.contains("recursion limit exceeded") {
+            Error(Box::new(ErrorImpl::RecursionLimitExceeded(err.problem_mark)))
+        } else {
+            Error(Box::new(ErrorImpl::Libyml(err)))
+        }
     }
 }
 
@@ -294,7 +300,7 @@ impl Display for ErrorImpl {
                 f.write_str("expected a mapping in merge element")
             }
             ErrorImpl::FailedToParseNumber => {
-                f.write_str("failed to parse number")
+                f.write_str("failed to parse YAML number")
             }
             ErrorImpl::EmptyTag => {
                 f.write_str("empty tag")

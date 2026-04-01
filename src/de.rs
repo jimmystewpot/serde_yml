@@ -1521,11 +1521,15 @@ pub(crate) fn ambiguous_string(scalar: &str) -> bool {
     if scalar.is_empty() {
         return true;
     }
+    if scalar.contains(['\n', '\r', '\t']) {
+        return true;
+    }
     let first = scalar.as_bytes()[0];
     if first.is_ascii_digit()
         || first == b'-'
         || first == b'.'
         || first == b'+'
+        || first == b'#'
     {
         return true;
     }

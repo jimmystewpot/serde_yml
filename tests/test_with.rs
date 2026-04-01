@@ -266,7 +266,7 @@ mod tests {
         singleton_map::serialize(&value, &mut serializer).unwrap();
         let yaml = String::from_utf8(serializer.into_inner().unwrap())
             .unwrap();
-        assert_eq!(yaml, "Tuple:\n- 1\n- 2\n");
+        assert_eq!(yaml, "Tuple:\n  - 1\n  - 2\n");
 
         let value = MyEnum::Struct { value: 42 };
         let mut serializer =

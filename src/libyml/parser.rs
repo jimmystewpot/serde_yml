@@ -16,6 +16,7 @@ use yaml_rust2::scanner::{Marker, TScalarStyle};
 #[derive(Debug)]
 pub struct Parser<'input> {
     events: VecDeque<(Event<'input>, Mark)>,
+    error: Option<Error>,
     _input: Cow<'input, [u8]>,
 }
 
@@ -114,6 +115,9 @@ impl<'input> Parser<'input> {
                 context_mark: Mark::default(),
             })?;
 
+        // Strip UTF-8 BOM if it exists
+        let input_str = input_str.strip_prefix('\u{feff}').unwrap_or(input_str);
+
         let mut events = VecDeque::new();
         let mut parser = YamlParser::new(input_str.chars());
         let mut collector = EventCollector {
@@ -121,8 +125,8 @@ impl<'input> Parser<'input> {
             anchors: Vec::new(),
         };
 
-        if let Err(scan_error) = parser.load(&mut collector, true) {
-            return Err(Error {
+        let error = parser.load(&mut collector, true).err().map(|scan_error| {
+            Error {
                 problem: scan_error.to_string(),
                 problem_offset: 0,
                 problem_mark: Mark {
@@ -132,11 +136,12 @@ impl<'input> Parser<'input> {
                 },
                 context: None,
                 context_mark: Mark::default(),
-            });
-        }
+            }
+        });
 
         Ok(Parser {
             events,
+            error,
             _input: input,
         })
     }
@@ -145,12 +150,18 @@ impl<'input> Parser<'input> {
     pub fn parse_next_event(
         &mut self,
     ) -> Result<(Event<'input>, Mark)> {
-        self.events.pop_front().ok_or_else(|| Error {
-            problem: "Unexpected end of event stream".to_string(),
-            problem_offset: 0,
-            problem_mark: Mark::default(),
-            context: None,
-            context_mark: Mark::default(),
+        self.events.pop_front().ok_or_else(|| {
+            self.error.take().unwrap_or_else(|| Error {
+                problem: "Unexpected end of event stream".to_string(),
+                problem_offset: 0,
+                problem_mark: Mark {
+                    index: 0,
+                    line: 0,
+                    column: 0,
+                },
+                context: None,
+                context_mark: Mark::default(),
+            })
         })
     }
 
@@ -190,7 +201,7 @@ impl MarkedEventReceiver for EventCollector<'_, '_> {
             YamlEvent::Scalar(val, style, id, tag) => {
                 let anchor = if id > 0 {
                     let a = Anchor(Box::from(
-                        format!("&{}", id).into_bytes(),
+                        format!("{}", id).into_bytes(),
                     ));
                     if id > self.anchors.len() {
                         self.anchors.resize(id, a.clone());
@@ -202,7 +213,9 @@ impl MarkedEventReceiver for EventCollector<'_, '_> {
                 };
                 Event::Scalar(Scalar {
                     anchor,
-                    tag: tag.map(|t| Tag::new(&format!("{:?}", t))),
+                    tag: tag.map(|t| {
+                        Tag::new(&format!("{}{}", t.handle, t.suffix))
+                    }),
                     value: Box::from(val.as_bytes()),
                     style: match style {
                         TScalarStyle::Plain => ScalarStyle::Plain,
@@ -221,7 +234,7 @@ impl MarkedEventReceiver for EventCollector<'_, '_> {
             YamlEvent::SequenceStart(id, tag) => {
                 let anchor = if id > 0 {
                     let a = Anchor(Box::from(
-                        format!("&{}", id).into_bytes(),
+                        format!("{}", id).into_bytes(),
                     ));
                     if id > self.anchors.len() {
                         self.anchors.resize(id, a.clone());
@@ -233,14 +246,16 @@ impl MarkedEventReceiver for EventCollector<'_, '_> {
                 };
                 Event::SequenceStart(SequenceStart {
                     anchor,
-                    tag: tag.map(|t| Tag::new(&format!("{:?}", t))),
+                    tag: tag.map(|t| {
+                        Tag::new(&format!("{}{}", t.handle, t.suffix))
+                    }),
                 })
             }
             YamlEvent::SequenceEnd => Event::SequenceEnd,
             YamlEvent::MappingStart(id, tag) => {
                 let anchor = if id > 0 {
                     let a = Anchor(Box::from(
-                        format!("&{}", id).into_bytes(),
+                        format!("{}", id).into_bytes(),
                     ));
                     if id > self.anchors.len() {
                         self.anchors.resize(id, a.clone());
@@ -252,7 +267,9 @@ impl MarkedEventReceiver for EventCollector<'_, '_> {
                 };
                 Event::MappingStart(MappingStart {
                     anchor,
-                    tag: tag.map(|t| Tag::new(&format!("{:?}", t))),
+                    tag: tag.map(|t| {
+                        Tag::new(&format!("{}{}", t.handle, t.suffix))
+                    }),
                 })
             }
             YamlEvent::MappingEnd => Event::MappingEnd,
