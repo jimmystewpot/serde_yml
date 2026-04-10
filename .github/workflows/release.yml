@@ -89,7 +89,7 @@ jobs:
       # Upload the binary for each target
       - name: Upload the binary
         id: upload-binary
-        uses: actions/upload-artifact@v7.0.0
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: ${{ env.TARGET }}.tar.gz
           path: target/package/${{ env.TARGET }}.tar.gz
