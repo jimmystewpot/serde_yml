@@ -73,7 +73,7 @@ jobs:
       # Cache dependencies to speed up subsequent builds.
       - name: Cache dependencies
         id: cache-dependencies
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@v6.1.0
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
@@ -127,7 +127,7 @@ jobs:
 
       # Cache dependencies to speed up subsequent builds
       - name: Cache dependencies
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@v6.1.0
         with:
           path: ~/.cargo
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
@@ -231,7 +231,7 @@ jobs:
       - name: Cache dependencies
         if: steps.check-token.outputs.skip != 'true'
         id: cache-dependencies
-        uses: actions/cache@v5.0.5
+        uses: actions/cache@v6.1.0
         with:
           path: /home/runner/.cargo/registry/index/
           key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
