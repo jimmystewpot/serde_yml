@@ -9,7 +9,7 @@ enum Context {
     /// Inside a sequence, tracks index.
     Sequence { index: usize },
     /// Inside a mapping, tracks whether next event is key or value.
-    Mapping { is_key: bool },
+    Mapping { is_key: bool, entries: usize },
 }
 
 /// A YAML emitter that writes events to a writer.
@@ -176,7 +176,10 @@ where
                                 '\t' => self.write_all(b"\\t")?,
                                 _ => {
                                     let mut b = [0u8; 4];
-                                    self.write_all(c.encode_utf8(&mut b).as_bytes())?;
+                                    self.write_all(
+                                        c.encode_utf8(&mut b)
+                                            .as_bytes(),
+                                    )?;
                                 }
                             }
                         }
@@ -191,7 +194,9 @@ where
                                 self.write_all(b"  ")?;
                             }
                             self.write_all(line.as_bytes())?;
-                            if lines.peek().is_some() || scalar.value.ends_with('\n') {
+                            if lines.peek().is_some()
+                                || scalar.value.ends_with('\n')
+                            {
                                 self.write_all(b"\n")?;
                             }
                         }
@@ -208,7 +213,9 @@ where
                                     self.write_all(b"  ")?;
                                 }
                                 self.write_all(line.as_bytes())?;
-                                if lines.peek().is_some() || scalar.value.ends_with('\n') {
+                                if lines.peek().is_some()
+                                    || scalar.value.ends_with('\n')
+                                {
                                     self.write_all(b"\n")?;
                                 }
                             }
@@ -223,7 +230,10 @@ where
                     self.need_newline = true;
                 } else if is_key {
                     self.need_newline = false;
-                } else if !matches!(scalar.style, ScalarStyle::Literal | ScalarStyle::Folded) {
+                } else if !matches!(
+                    scalar.style,
+                    ScalarStyle::Literal | ScalarStyle::Folded
+                ) {
                     self.write_all(b"\n")?;
                     self.need_newline = false;
                 } else {
@@ -238,6 +248,7 @@ where
                     Some(Context::Sequence { .. })
                 );
                 let is_value = self.is_mapping_value();
+                let inline = self.first_item_inline;
 
                 if self.first_item_inline {
                     self.first_item_inline = false;
@@ -248,22 +259,43 @@ where
                     self.write_indent()?;
                     self.write_all(b"- ")?;
                 } else if is_value {
-                    self.write_all(b": ")?;
+                    self.write_all(b":\n")?;
+                    self.need_newline = false;
                 } else if self.need_newline {
                     self.write_all(b"\n")?;
                 }
 
                 if let Some(ref tag) = seq.tag {
+                    if !is_value && !in_seq && !inline {
+                        if self.need_newline {
+                            self.write_all(b"\n")?;
+                        }
+                        self.write_indent()?;
+                    }
                     self.write_all(tag.as_bytes())?;
                     self.write_all(b"\n")?;
                     self.need_newline = false;
+                    self.first_item_inline = false;
+                } else {
+                    self.first_item_inline = !is_value;
                 }
 
                 self.stack.push(Context::Sequence { index: 0 });
             }
             Event::SequenceEnd => {
+                let was_empty = matches!(
+                    self.stack.last(),
+                    Some(Context::Sequence { index: 0 })
+                );
                 self.stack.pop();
-                self.need_newline = true;
+
+                if was_empty {
+                    self.write_all(b"[]\n")?;
+                    self.need_newline = false;
+                } else if self.need_newline {
+                    self.write_all(b"\n")?;
+                    self.need_newline = false;
+                }
                 self.increment_parent();
             }
             Event::MappingStart(mapping) => {
@@ -272,6 +304,7 @@ where
                     Some(Context::Sequence { .. })
                 );
                 let is_value = self.is_mapping_value();
+                let inline = self.first_item_inline;
 
                 if self.first_item_inline {
                     self.first_item_inline = false;
@@ -282,27 +315,46 @@ where
                     self.write_indent()?;
                     self.write_all(b"- ")?;
                 } else if is_value {
-                    self.write_all(b": ")?;
+                    self.write_all(b":\n")?;
+                    self.need_newline = false;
                 } else if self.need_newline {
                     self.write_all(b"\n")?;
                 }
 
                 if let Some(ref tag) = mapping.tag {
+                    if !is_value && !in_seq && !inline {
+                        if self.need_newline {
+                            self.write_all(b"\n")?;
+                        }
+                        self.write_indent()?;
+                    }
                     self.write_all(tag.as_bytes())?;
                     self.write_all(b"\n")?;
                     self.need_newline = false;
-                } else if is_value {
-                    self.write_all(b"\n")?;
-                    self.need_newline = false;
+                    self.first_item_inline = false;
                 } else {
-                    self.first_item_inline = true;
+                    self.first_item_inline = !is_value;
                 }
 
-                self.stack.push(Context::Mapping { is_key: true });
+                self.stack.push(Context::Mapping {
+                    is_key: true,
+                    entries: 0,
+                });
             }
             Event::MappingEnd => {
+                let was_empty = matches!(
+                    self.stack.last(),
+                    Some(Context::Mapping { entries: 0, .. })
+                );
                 self.stack.pop();
-                self.need_newline = true;
+
+                if was_empty {
+                    self.write_all(b"{}\n")?;
+                    self.need_newline = false;
+                } else if self.need_newline {
+                    self.write_all(b"\n")?;
+                    self.need_newline = false;
+                }
                 self.increment_parent();
             }
         }
@@ -322,22 +374,38 @@ where
     }
 
     fn indent_depth(&self) -> usize {
-        self.stack.len()
+        let mut depth = 0;
+        for ctx in &self.stack {
+            match ctx {
+                Context::Mapping { .. } => depth += 1,
+                Context::Sequence { .. } => depth += 1,
+            }
+        }
+        if depth > 0 { depth - 1 } else { 0 }
     }
 
     fn is_mapping_key(&self) -> bool {
-        matches!(self.stack.last(), Some(Context::Mapping { is_key: true }))
+        matches!(
+            self.stack.last(),
+            Some(Context::Mapping { is_key: true, .. })
+        )
     }
 
     fn is_mapping_value(&self) -> bool {
-        matches!(self.stack.last(), Some(Context::Mapping { is_key: false }))
+        matches!(
+            self.stack.last(),
+            Some(Context::Mapping { is_key: false, .. })
+        )
     }
 
     fn increment_parent(&mut self) {
         if let Some(ctx) = self.stack.last_mut() {
             match ctx {
                 Context::Sequence { index } => *index += 1,
-                Context::Mapping { is_key } => *is_key = !*is_key,
+                Context::Mapping { is_key, entries } => {
+                    *is_key = !*is_key;
+                    *entries += 1;
+                }
             }
         }
     }
