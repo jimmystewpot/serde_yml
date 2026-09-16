@@ -189,7 +189,7 @@ jobs:
   # Publish the release to Crates.io automatically
   crate:
     name: ❯ Crate.io 🦀
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push' && secrets.CARGO_API_TOKEN != ''
     needs: release
     runs-on: ubuntu-latest
 
@@ -218,11 +218,6 @@ jobs:
           NEW_VERSION=$(grep version Cargo.toml | sed -n 2p | cut -d '"' -f 2)
           echo "VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
         shell: /bin/bash -e {0}
-
-      # Log in to crates.io
-      - name: Log in to crates.io
-        id: login-crate-io
-        run: cargo login ${{ secrets.CARGO_API_TOKEN }}
 
       # Publish the Rust library to Crate.io
       - name: Publish Library to Crate.io

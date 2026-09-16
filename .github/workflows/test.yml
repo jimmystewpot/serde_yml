@@ -9,7 +9,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         toolchain: [stable, nightly]
-    continue-on-error: true
+    continue-on-error: ${{ matrix.toolchain == 'nightly' }}
 
     steps:
       # Checkout the repository

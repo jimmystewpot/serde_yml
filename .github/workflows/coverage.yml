@@ -28,8 +28,8 @@ jobs:
         run: cargo llvm-cov --all-features --workspace --codecov --output-path codecov.json
 
       - name: Upload to Codecov.io
-        uses: codecov/codecov-action@v6.0.1
+        uses: codecov/codecov-action@v7.1.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: codecov.json
-          fail_ci_if_error: true
+          fail_ci_if_error: false
