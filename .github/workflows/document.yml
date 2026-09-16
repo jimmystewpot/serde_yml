@@ -11,11 +11,16 @@ on:
   release:
     types: [created]
 
+permissions:
+  contents: read
+
 jobs:
   all:
     name: Document
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
     steps:
