@@ -146,7 +146,7 @@ jobs:
         env:
           BUILD_ID: ${{ github.run_id }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_URL: https://github.com/sebastienrousseau/serde_yml/releases
+          RELEASE_URL: https://github.com/jimmystewpot/serde_yml/releases
           TARGET: ${{ env.TARGET }}
 
         run: |
