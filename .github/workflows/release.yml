@@ -189,21 +189,36 @@ jobs:
   # Publish the release to Crates.io automatically
   crate:
     name: ❯ Crate.io 🦀
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push' && secrets.CARGO_API_TOKEN != ''
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     needs: release
     runs-on: ubuntu-latest
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_API_TOKEN }}
 
     steps:
+      - name: Check for Crates.io token
+        id: check-token
+        run: |
+          if [ -z "${CARGO_REGISTRY_TOKEN}" ]; then
+            echo "CARGO_API_TOKEN secret is not set, skipping crates.io publish."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # Check out the repository code
       - name: Checkout
+        if: steps.check-token.outputs.skip != 'true'
         uses: actions/checkout@v6.0.3
 
       # Install the stable Rust toolchain
       - name: Install stable toolchain
+        if: steps.check-token.outputs.skip != 'true'
         run: rustup update stable
 
       # Cache dependencies to speed up subsequent builds
       - name: Cache dependencies
+        if: steps.check-token.outputs.skip != 'true'
         id: cache-dependencies
         uses: actions/cache@v5.0.5
         with:
@@ -213,6 +228,7 @@ jobs:
 
       # Update the version number based on the Cargo.toml file
       - name: Update version number
+        if: steps.check-token.outputs.skip != 'true'
         id: update-version
         run: |
           NEW_VERSION=$(grep version Cargo.toml | sed -n 2p | cut -d '"' -f 2)
@@ -221,7 +237,6 @@ jobs:
 
       # Publish the Rust library to Crate.io
       - name: Publish Library to Crate.io
+        if: steps.check-token.outputs.skip != 'true'
         id: publish-library
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_API_TOKEN }}
         run: cargo publish --no-verify --allow-dirty
