@@ -502,3 +502,48 @@ fn test_duplicate_keys() {
         "duplicate entry in YAML map at line 3 column 3 in .";
     test_error::<Value>(yaml, expected);
 }
+
+#[test]
+fn test_map_deserializer_out_of_order_calls_do_not_panic() {
+    use serde::de::{
+        DeserializeSeed, Deserializer, MapAccess, Visitor,
+    };
+
+    struct PrematureValueVisitor;
+    impl<'de> Visitor<'de> for PrematureValueVisitor {
+        type Value = ();
+        fn expecting(
+            &self,
+            formatter: &mut Formatter<'_>,
+        ) -> fmt::Result {
+            formatter.write_str("premature value test")
+        }
+        fn visit_map<M: MapAccess<'de>>(
+            self,
+            mut access: M,
+        ) -> Result<Self::Value, M::Error> {
+            struct UnitSeed;
+            impl<'de> DeserializeSeed<'de> for UnitSeed {
+                type Value = ();
+                fn deserialize<D: Deserializer<'de>>(
+                    self,
+                    _d: D,
+                ) -> Result<(), D::Error> {
+                    Ok(())
+                }
+            }
+            // Calling next_value_seed before next_key_seed should return Err, not panic
+            assert!(access.next_value_seed(UnitSeed).is_err());
+            Ok(())
+        }
+    }
+
+    let map = serde_yml::Mapping::new();
+    let val = Value::Mapping(map);
+
+    // Test owned Value visit_map (exercises MapDeserializer)
+    let _ = Value::deserialize_any(val.clone(), PrematureValueVisitor);
+
+    // Test borrowed &Value visit_map (exercises MapRefDeserializer)
+    let _ = Deserializer::deserialize_any(&val, PrematureValueVisitor);
+}

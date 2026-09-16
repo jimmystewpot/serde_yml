@@ -756,7 +756,9 @@ impl<'de> MapAccess<'de> for MapDeserializer {
     {
         match self.value.take() {
             Some(value) => seed.deserialize(value),
-            None => panic!("visit_value called before visit_key"),
+            None => Err(de::Error::custom(
+                "visit_value called before visit_key",
+            )),
         }
     }
 
@@ -1314,7 +1316,9 @@ impl<'de> MapAccess<'de> for MapRefDeserializer<'de> {
     {
         match self.value.take() {
             Some(value) => seed.deserialize(value),
-            None => panic!("visit_value called before visit_key"),
+            None => Err(de::Error::custom(
+                "visit_value called before visit_key",
+            )),
         }
     }
 
