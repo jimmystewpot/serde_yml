@@ -130,8 +130,11 @@ mod tests {
         - 'single quoted'
         - \"double quoted\"
     "};
-        let expected =
-            vec!["plain nonàscii".to_owned(), "single quoted".to_owned(), "double quoted".to_owned()];
+        let expected = vec![
+            "plain nonàscii".to_owned(),
+            "single quoted".to_owned(),
+            "double quoted".to_owned(),
+        ];
         test_de_no_value(yaml, &expected);
     }
 

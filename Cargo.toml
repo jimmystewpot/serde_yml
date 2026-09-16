@@ -37,22 +37,22 @@ include = [
 
 
 [dependencies]
-indexmap = "2.2.4"
-itoa = "1.0"
-yaml-rust2 = "0.11.0"
-hashlink = "0.12.1"
-memchr = { version = "2", default-features = false }
-ryu = "1.0"
-serde = { version = "1.0.204" }
+indexmap = "2.14.2"
+itoa = "1.0.18"
+yaml-rust2 = "0.13.0"
+hashlink = "0.12.2"
+memchr = { version = "2.8.3", default-features = false }
+ryu = "1.0.23"
+serde = { version = "1.0.229" }
 
 [build-dependencies]
 # Dependencies for build scripts.
-version_check = "0.9.4" # Check the Rust version used to compile the package.
+version_check = "0.9.5" # Check the Rust version used to compile the package.
 
 [dev-dependencies]
-indoc = "2.0.5"
-serde = { version = "1.0.204", features = ["derive"] }
-serde_derive = "1.0.204"
+indoc = "2.0.7"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_derive = "1.0.229"
 
 [features]
 default = []

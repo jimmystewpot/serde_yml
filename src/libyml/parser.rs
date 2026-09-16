@@ -116,7 +116,8 @@ impl<'input> Parser<'input> {
             })?;
 
         // Strip UTF-8 BOM if it exists
-        let input_str = input_str.strip_prefix('\u{feff}').unwrap_or(input_str);
+        let input_str =
+            input_str.strip_prefix('\u{feff}').unwrap_or(input_str);
 
         let mut events = VecDeque::new();
         let mut parser = YamlParser::new(input_str.chars());
@@ -125,19 +126,20 @@ impl<'input> Parser<'input> {
             anchors: Vec::new(),
         };
 
-        let error = parser.load(&mut collector, true).err().map(|scan_error| {
-            Error {
-                problem: scan_error.to_string(),
-                problem_offset: 0,
-                problem_mark: Mark {
-                    index: scan_error.marker().index() as u64,
-                    line: scan_error.marker().line() as u64,
-                    column: scan_error.marker().col() as u64,
-                },
-                context: None,
-                context_mark: Mark::default(),
-            }
-        });
+        let error =
+            parser.load(&mut collector, true).err().map(|scan_error| {
+                Error {
+                    problem: scan_error.to_string(),
+                    problem_offset: 0,
+                    problem_mark: Mark {
+                        index: scan_error.marker().index() as u64,
+                        line: scan_error.marker().line() as u64,
+                        column: scan_error.marker().col() as u64,
+                    },
+                    context: None,
+                    context_mark: Mark::default(),
+                }
+            });
 
         Ok(Parser {
             events,

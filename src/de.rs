@@ -332,15 +332,13 @@ impl<'de> Deserializer<'de> {
                             process_scalar = true;
                         }
                     }
-                    Event::Scalar(scalar) => {
-                        if process_scalar {
-                            path.insert(
-                                0,
-                                String::from_utf8_lossy(&scalar.value)
-                                    .to_string(),
-                            );
-                            process_scalar = false;
-                        }
+                    Event::Scalar(scalar) if process_scalar => {
+                        path.insert(
+                            0,
+                            String::from_utf8_lossy(&scalar.value)
+                                .to_string(),
+                        );
+                        process_scalar = false;
                     }
                     _ => {}
                 }

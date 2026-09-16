@@ -2,7 +2,8 @@ use crate::libyml::emitter::{
     Emitter, Event, Mapping, Scalar, ScalarStyle, Sequence,
 };
 use crate::modules::error::{Error, ErrorImpl, Result};
-use serde::ser::{self};
+use crate::value::tagged::{self, MaybeTag};
+use serde::ser::{self, SerializeMap};
 use std::fmt::Display;
 use std::io;
 
@@ -200,12 +201,17 @@ where
 
     /// Takes the tag from the serializer state.
     pub fn take_tag(&mut self) -> Option<String> {
-        if let State::FoundTag(tag) = std::mem::replace(
+        let state = std::mem::replace(
             &mut self.state,
             State::NothingInParticular,
-        ) {
+        );
+        if let State::FoundTag(mut tag) = state {
+            if !tag.starts_with('!') {
+                tag.insert(0, '!');
+            }
             Some(tag)
         } else {
+            self.state = state;
             None
         }
     }
@@ -327,30 +333,52 @@ where
 
     fn serialize_char(self, v: char) -> Result<()> {
         let mut b = [0u8; 4];
-        self.serialize_str(v.encode_utf8(&mut b))
-    }
-
-    fn serialize_str(self, v: &str) -> Result<()> {
         self.emit_scalar(Scalar {
             tag: None,
-            value: v,
-            style: if v.contains(['\n', '\r', '\t', '"', '\\']) {
-                ScalarStyle::DoubleQuoted
-            } else if crate::de::ambiguous_string(v) {
-                ScalarStyle::SingleQuoted
-            } else {
-                ScalarStyle::Plain
-            },
+            value: v.encode_utf8(&mut b),
+            style: ScalarStyle::SingleQuoted,
         })
     }
 
-    fn serialize_bytes(self, v: &[u8]) -> Result<()> {
-        use serde::ser::SerializeSeq;
-        let mut seq = self.serialize_seq(Some(v.len()))?;
-        for byte in v {
-            seq.serialize_element(byte)?;
-        }
-        seq.end()
+    fn serialize_str(self, v: &str) -> Result<()> {
+        let needs_double_quotes = v.chars().any(|c| {
+            (c < ' ' && c != '\n')
+                || c == '\x7f'
+                || c == '"'
+                || c == '\\'
+                || c == '\u{85}'
+                || c == '\u{2028}'
+                || c == '\u{2029}'
+                || c == '\u{feff}'
+        });
+        let style = if needs_double_quotes {
+            ScalarStyle::DoubleQuoted
+        } else if v.contains('\n') {
+            ScalarStyle::Literal
+        } else if crate::de::ambiguous_string(v)
+            || v.starts_with(' ')
+            || v.ends_with(' ')
+            || v.is_empty()
+            || v.starts_with([
+                '@', '`', '&', '*', '!', '|', '>', '\'', '"', '%', '?',
+                ':', '-', '[', '{', ']', '}', ',',
+            ])
+            || v.contains(": ")
+            || v.contains(" #")
+        {
+            ScalarStyle::SingleQuoted
+        } else {
+            ScalarStyle::Plain
+        };
+        self.emit_scalar(Scalar {
+            tag: None,
+            value: v,
+            style,
+        })
+    }
+
+    fn serialize_bytes(self, _v: &[u8]) -> Result<()> {
+        Err(Error::new(ErrorImpl::BytesUnsupported))
     }
 
     fn serialize_none(self) -> Result<()> {
@@ -382,11 +410,19 @@ where
         _variant_index: u32,
         variant: &'static str,
     ) -> Result<()> {
-        self.emit_scalar(Scalar {
-            tag: Some(format!("!{}", variant)),
-            value: "null",
-            style: ScalarStyle::Plain,
-        })
+        if !self.config.tag_unit_variants {
+            self.serialize_str(variant)
+        } else {
+            if let State::FoundTag(_) = self.state {
+                return Err(Error::new(ErrorImpl::SerializeNestedEnum));
+            }
+            self.state = State::FoundTag(variant.to_owned());
+            self.emit_scalar(Scalar {
+                tag: None,
+                value: "",
+                style: ScalarStyle::Plain,
+            })
+        }
     }
 
     fn serialize_newtype_struct<T>(
@@ -410,6 +446,9 @@ where
     where
         T: ?Sized + ser::Serialize,
     {
+        if let State::FoundTag(_) = self.state {
+            return Err(Error::new(ErrorImpl::SerializeNestedEnum));
+        }
         self.state = State::FoundTag(format!("!{}", variant));
         value.serialize(self)
     }
@@ -442,17 +481,29 @@ where
         _name: &'static str,
         _variant_index: u32,
         variant: &'static str,
-        _len: usize,
+        len: usize,
     ) -> Result<Self::SerializeTupleVariant> {
+        if let State::FoundTag(_) = self.state {
+            return Err(Error::new(ErrorImpl::SerializeNestedEnum));
+        }
         self.state = State::FoundTag(format!("!{}", variant));
-        self.serialize_seq(Some(_len))
+        self.serialize_seq(Some(len))
     }
 
     fn serialize_map(
         self,
-        _len: Option<usize>,
+        len: Option<usize>,
     ) -> Result<Self::SerializeMap> {
-        self.emit_mapping_start()?;
+        if len == Some(1) {
+            self.state = if let State::FoundTag(_) = self.state {
+                self.emit_mapping_start()?;
+                State::CheckForDuplicateTag
+            } else {
+                State::CheckForTag
+            };
+        } else {
+            self.emit_mapping_start()?;
+        }
         Ok(self)
     }
 
@@ -461,7 +512,8 @@ where
         _name: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStruct> {
-        self.serialize_map(Some(_len))
+        self.emit_mapping_start()?;
+        Ok(self)
     }
 
     fn serialize_struct_variant(
@@ -471,15 +523,38 @@ where
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStructVariant> {
+        if let State::FoundTag(_) = self.state {
+            return Err(Error::new(ErrorImpl::SerializeNestedEnum));
+        }
         self.state = State::FoundTag(format!("!{}", variant));
-        self.serialize_map(Some(_len))
+        self.emit_mapping_start()?;
+        Ok(self)
     }
 
     fn collect_str<T>(self, value: &T) -> Result<()>
     where
         T: ?Sized + Display,
     {
-        let string = value.to_string();
+        let string = if let State::CheckForTag
+        | State::CheckForDuplicateTag = self.state
+        {
+            match tagged::check_for_tag(value) {
+                MaybeTag::NotTag(string) => string,
+                MaybeTag::Tag(string) => {
+                    return if let State::CheckForDuplicateTag =
+                        self.state
+                    {
+                        Err(Error::new(ErrorImpl::SerializeNestedEnum))
+                    } else {
+                        self.state = State::FoundTag(string);
+                        Ok(())
+                    };
+                }
+            }
+        } else {
+            value.to_string()
+        };
+
         self.serialize_str(&string)
     }
 }
@@ -560,7 +635,7 @@ where
     }
 }
 
-impl<'a, W> ser::SerializeMap for &mut Serializer<'a, W>
+impl<'a, W> SerializeMap for &mut Serializer<'a, W>
 where
     W: io::Write + 'a,
 {
@@ -627,8 +702,7 @@ where
     where
         V: ?Sized + ser::Serialize,
     {
-        ser::Serializer::serialize_str(&mut **self, key)?;
-        value.serialize(&mut **self)
+        self.serialize_entry(key, value)
     }
 
     fn end(self) -> Result<()> {
@@ -651,8 +725,7 @@ where
     where
         V: ?Sized + ser::Serialize,
     {
-        ser::Serializer::serialize_str(&mut **self, field)?;
-        v.serialize(&mut **self)
+        self.serialize_entry(field, v)
     }
 
     fn end(self) -> Result<()> {
@@ -670,7 +743,9 @@ where
     T: ?Sized + ser::Serialize,
 {
     let mut serializer = Serializer::new(writer)?;
-    value.serialize(&mut serializer)
+    value.serialize(&mut serializer)?;
+    serializer.into_inner()?;
+    Ok(())
 }
 
 /// Serialize the given data structure as a String of YAML.
