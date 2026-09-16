@@ -295,14 +295,16 @@ impl<'de> Deserializer<'de> {
 
         let mut anchors = Vec::new();
         for (alias_id, document_index) in &document.anchor_event_map {
-            let anchor_name =
-                document.anchor_names.get(alias_id).unwrap();
+            let Some(anchor_name) = document.anchor_names.get(alias_id)
+            else {
+                continue;
+            };
             let anchor_path = self.event_path(*document_index);
             let mut anchors_aliases = Vec::new();
-            for alias_index in
-                aliases.get(alias_id).unwrap_or(&Vec::new())
-            {
-                anchors_aliases.push(self.event_path(*alias_index));
+            if let Some(alias_indices) = aliases.get(alias_id) {
+                for alias_index in alias_indices {
+                    anchors_aliases.push(self.event_path(*alias_index));
+                }
             }
 
             anchors.push(DocumentAnchor {
@@ -1627,7 +1629,9 @@ fn invalid_type(event: &Event<'_>, exp: &dyn Expected) -> Error {
     }
 
     match event {
-        Event::Alias(_) => unreachable!(), // If you expect this case to be unreachable, it's fine to leave.
+        Event::Alias(_) => {
+            de::Error::invalid_type(Unexpected::Other("alias"), exp)
+        }
         Event::Scalar(scalar) => {
             let get_type = InvalidType { exp };
             visit_scalar(get_type, scalar, false).unwrap_err()
@@ -2531,4 +2535,37 @@ where
     T: Deserialize<'de>,
 {
     T::deserialize(Deserializer::from_slice(v))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn test_invalid_type_alias() {
+        let err = invalid_type(&Event::Alias(0), &"a string");
+        assert_eq!(
+            err.to_string(),
+            "invalid type: alias, expected a string"
+        );
+    }
+
+    #[test]
+    fn test_anchors_missing_anchor_name_skipped() {
+        let mut document = Document {
+            events: vec![(Event::Alias(0), Mark::default())],
+            error: None,
+            anchor_event_map: BTreeMap::new(),
+            anchor_names: BTreeMap::new(),
+        };
+        document.anchor_event_map.insert(0, 0);
+        // document.anchor_names does NOT contain 0, simulating corrupted/missing anchor name
+        let de = Deserializer {
+            progress: Progress::Document(document),
+        };
+        let anchors = de.anchors();
+        assert!(anchors.is_some());
+        assert_eq!(anchors.unwrap().len(), 0);
+    }
 }
