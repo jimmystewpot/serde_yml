@@ -423,19 +423,23 @@ impl ser::SerializeMap for SerializeMap {
     {
         let (mapping, key) = match self {
             SerializeMap::CheckForTag | SerializeMap::Tagged(_) => {
-                unreachable!()
+                return Err(ser::Error::custom(
+                    "serialize_value called before serialize_key",
+                ));
             }
             SerializeMap::Untagged { mapping, next_key } => {
                 (mapping, next_key)
             }
         };
         match key.take() {
-            Some(key) => mapping.insert(key, to_value(value)?),
-            None => {
-                panic!("serialize_value called before serialize_key")
+            Some(key) => {
+                mapping.insert(key, to_value(value)?);
+                Ok(())
             }
-        };
-        Ok(())
+            None => Err(ser::Error::custom(
+                "serialize_value called before serialize_key",
+            )),
+        }
     }
 
     fn serialize_entry<K, V>(

@@ -502,3 +502,69 @@ fn test_duplicate_keys() {
         "duplicate entry in YAML map at line 3 column 3 in .";
     test_error::<Value>(yaml, expected);
 }
+
+#[test]
+fn test_map_deserializer_out_of_order_calls_do_not_panic() {
+    use serde::de::{
+        DeserializeSeed, Deserializer, MapAccess, Visitor,
+    };
+
+    struct PrematureValueVisitor;
+    impl<'de> Visitor<'de> for PrematureValueVisitor {
+        type Value = ();
+        #[allow(unused_qualifications)]
+        fn expecting(
+            &self,
+            formatter: &mut Formatter<'_>,
+        ) -> std::fmt::Result {
+            formatter.write_str("premature value test")
+        }
+        fn visit_map<M: MapAccess<'de>>(
+            self,
+            mut access: M,
+        ) -> Result<Self::Value, M::Error> {
+            struct UnitSeed;
+            impl<'de> DeserializeSeed<'de> for UnitSeed {
+                type Value = ();
+                fn deserialize<D: Deserializer<'de>>(
+                    self,
+                    _d: D,
+                ) -> Result<(), D::Error> {
+                    Ok(())
+                }
+            }
+            // Calling next_value_seed before next_key_seed should return Err, not panic
+            let err = access.next_value_seed(UnitSeed).unwrap_err();
+            assert!(
+                err.to_string()
+                    .contains("visit_value called before visit_key")
+            );
+            Ok(())
+        }
+    }
+
+    let map = serde_yml::Mapping::new();
+    let val = Value::Mapping(map);
+
+    // Test owned Value visit_map (exercises MapDeserializer)
+    let _ = Value::deserialize_any(val.clone(), PrematureValueVisitor);
+
+    // Test borrowed &Value visit_map (exercises MapRefDeserializer)
+    let _ = Deserializer::deserialize_any(&val, PrematureValueVisitor);
+}
+
+#[test]
+fn test_serialize_value_without_key_returns_error() {
+    use serde::ser::{SerializeMap, Serializer};
+
+    let serializer = serde_yml::value::Serializer;
+    for len in [None, Some(0), Some(1)] {
+        let mut map_serializer = serializer.serialize_map(len).unwrap();
+        let err = map_serializer.serialize_value(&42).unwrap_err();
+        assert!(
+            err.to_string().contains(
+                "serialize_value called before serialize_key"
+            )
+        );
+    }
+}

@@ -6,7 +6,8 @@ mod tests {
         clippy::cast_possible_wrap,
         clippy::derive_partial_eq_without_eq,
         clippy::similar_names,
-        clippy::uninlined_format_args
+        clippy::uninlined_format_args,
+        clippy::print_stderr
     )]
 
     use indoc::indoc;
@@ -1077,5 +1078,24 @@ mod tests {
             expected,
             serde_yml::from_str::<u128>(octal).unwrap()
         );
+    }
+
+    #[test]
+    fn test_anchors_extraction_safe_and_consistent() {
+        let yaml = indoc! {"
+            item: &my_anchor
+              name: target
+            ref: *my_anchor
+        "};
+        let mut de = Deserializer::from_str(yaml);
+        assert!(de.anchors().is_none());
+        let doc = de.next().unwrap();
+        let anchors = doc.anchors();
+        assert!(anchors.is_some());
+        let anchors = anchors.unwrap();
+        assert_eq!(anchors.len(), 1);
+        assert_eq!(anchors[0].anchor_name, "1");
+        assert_eq!(anchors[0].anchor_path, "/item");
+        assert_eq!(anchors[0].aliases, vec!["/ref"]);
     }
 }
