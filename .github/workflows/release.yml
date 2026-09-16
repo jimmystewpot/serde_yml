@@ -60,7 +60,7 @@ jobs:
       # Check out the repository code.
       - name: Checkout sources
         id: checkout
-        uses: actions/checkout@v6.0.3
+        uses: actions/checkout@v7.0.1
 
       # Install the stable Rust toolchain.
       - name: Install stable toolchain
@@ -112,7 +112,7 @@ jobs:
     steps:
       # Check out the repository code
       - name: Checkout sources
-        uses: actions/checkout@v6.0.3
+        uses: actions/checkout@v7.0.1
 
       # Install the stable Rust toolchain
       - name: Install stable toolchain
@@ -220,7 +220,7 @@ jobs:
       # Check out the repository code
       - name: Checkout
         if: steps.check-token.outputs.skip != 'true'
-        uses: actions/checkout@v6.0.3
+        uses: actions/checkout@v7.0.1
 
       # Install the stable Rust toolchain
       - name: Install stable toolchain
