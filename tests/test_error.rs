@@ -512,10 +512,11 @@ fn test_map_deserializer_out_of_order_calls_do_not_panic() {
     struct PrematureValueVisitor;
     impl<'de> Visitor<'de> for PrematureValueVisitor {
         type Value = ();
+        #[allow(unused_qualifications)]
         fn expecting(
             &self,
             formatter: &mut Formatter<'_>,
-        ) -> fmt::Result {
+        ) -> std::fmt::Result {
             formatter.write_str("premature value test")
         }
         fn visit_map<M: MapAccess<'de>>(
@@ -533,7 +534,11 @@ fn test_map_deserializer_out_of_order_calls_do_not_panic() {
                 }
             }
             // Calling next_value_seed before next_key_seed should return Err, not panic
-            assert!(access.next_value_seed(UnitSeed).is_err());
+            let err = access.next_value_seed(UnitSeed).unwrap_err();
+            assert!(
+                err.to_string()
+                    .contains("visit_value called before visit_key")
+            );
             Ok(())
         }
     }
@@ -553,10 +558,13 @@ fn test_serialize_value_without_key_returns_error() {
     use serde::ser::{SerializeMap, Serializer};
 
     let serializer = serde_yml::value::Serializer;
-    let mut map_serializer = serializer.serialize_map(None).unwrap();
-    let result = map_serializer.serialize_value(&42);
-    assert!(
-        result.is_err(),
-        "Expected error when serialize_value called before serialize_key"
-    );
+    for len in [None, Some(0), Some(1)] {
+        let mut map_serializer = serializer.serialize_map(len).unwrap();
+        let err = map_serializer.serialize_value(&42).unwrap_err();
+        assert!(
+            err.to_string().contains(
+                "serialize_value called before serialize_key"
+            )
+        );
+    }
 }

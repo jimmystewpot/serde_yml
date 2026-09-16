@@ -423,7 +423,9 @@ impl ser::SerializeMap for SerializeMap {
     {
         let (mapping, key) = match self {
             SerializeMap::CheckForTag | SerializeMap::Tagged(_) => {
-                unreachable!()
+                return Err(ser::Error::custom(
+                    "serialize_value called before serialize_key",
+                ));
             }
             SerializeMap::Untagged { mapping, next_key } => {
                 (mapping, next_key)
