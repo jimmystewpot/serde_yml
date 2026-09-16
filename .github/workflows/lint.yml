@@ -7,6 +7,7 @@ on:
       - feat/serde_yml
   pull_request:
     branches:
+      - master
       - feat/serde_yml
   release:
     types: [created]
