@@ -155,10 +155,7 @@ impl<'input> Loader<'input> {
     /// assert_eq!(document.events.len(), 4);
     /// ```
     pub fn next_document(&mut self) -> Option<Document<'input>> {
-        let parser = match &mut self.parser {
-            Some(parser) => parser,
-            None => return None,
-        };
+        let parser = self.parser.as_mut()?;
 
         let first = self.parsed_document_count == 0;
         self.parsed_document_count += 1;

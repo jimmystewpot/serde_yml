@@ -10,3 +10,6 @@
 build
 Cargo.lock
 Icon?
+token_usage.md
+token_audit.md
+context_map.md

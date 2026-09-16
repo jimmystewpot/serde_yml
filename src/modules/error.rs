@@ -238,7 +238,9 @@ impl From<libyml_error::Error> for Error {
         if err.problem.contains("found unknown anchor") {
             Error(Box::new(ErrorImpl::UnknownAnchor(err.problem_mark)))
         } else if err.problem.contains("recursion limit exceeded") {
-            Error(Box::new(ErrorImpl::RecursionLimitExceeded(err.problem_mark)))
+            Error(Box::new(ErrorImpl::RecursionLimitExceeded(
+                err.problem_mark,
+            )))
         } else {
             Error(Box::new(ErrorImpl::Libyml(err)))
         }

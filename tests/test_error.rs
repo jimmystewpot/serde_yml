@@ -43,8 +43,7 @@ fn test_incorrect_type() {
         ---
         str
     "};
-    let expected =
-        "invalid type: string \"str\", expected i16 at line 3 column 1 in .";
+    let expected = "invalid type: string \"str\", expected i16 at line 3 column 1 in .";
     test_error::<i16>(yaml, expected);
 }
 
@@ -117,7 +116,8 @@ fn test_ignored_unknown_anchor() {
         b: [*a]
         c: ~
     "};
-    let expected = "unknown anchor at line 2 column 5 at line 2 column 2 in .";
+    let expected =
+        "unknown anchor at line 2 column 5 at line 2 column 2 in .";
     test_error::<Wrapper>(yaml, expected);
 }
 
@@ -135,7 +135,8 @@ fn test_two_documents() {
         ---
         1
     "};
-    let expected = "expected a single YAML document but found more than one";
+    let expected =
+        "expected a single YAML document but found more than one";
     test_error::<usize>(yaml, expected);
 }
 
@@ -169,8 +170,7 @@ fn test_missing_enum_tag() {
         "V": 16
         "other": 32
     "#};
-    let expected =
-        "invalid type: map, expected a YAML tag starting with '!' at line 2 column 4 in .";
+    let expected = "invalid type: map, expected a YAML tag starting with '!' at line 2 column 4 in .";
     test_error::<E>(yaml, expected);
 }
 
@@ -186,14 +186,24 @@ fn test_serialize_nested_enum() {
         #[allow(dead_code)]
         Tuple(usize, usize),
         #[allow(dead_code)]
-        Struct { x: usize },
+        Struct {
+            x: usize,
+        },
     }
 
-    // This used to fail during serialization, but it seems it now succeeds or fails differently.
-    // Let's check current behavior.
+    let expected = "serializing nested enums is not supported";
+
     let e = Outer::Inner(Inner::Newtype(0));
-    let result = serde_yml::to_string(&e);
-    assert!(result.is_ok()); // It seems it now supports nested enums in some cases?
+    let error = serde_yml::to_string(&e).unwrap_err();
+    assert_eq!(error.to_string(), expected);
+
+    let e = Outer::Inner(Inner::Tuple(0, 0));
+    let error = serde_yml::to_string(&e).unwrap_err();
+    assert_eq!(error.to_string(), expected);
+
+    let e = Outer::Inner(Inner::Struct { x: 0 });
+    let error = serde_yml::to_string(&e).unwrap_err();
+    assert_eq!(error.to_string(), expected);
 }
 
 #[test]
@@ -470,7 +480,8 @@ fn test_duplicate_keys() {
         null: true
         ~: false
     "};
-    let expected = "duplicate entry with null key at line 3 column 5 in .";
+    let expected =
+        "duplicate entry with null key at line 3 column 5 in .";
     test_error::<Value>(yaml, expected);
 
     let yaml = indoc! {"
@@ -478,7 +489,8 @@ fn test_duplicate_keys() {
         99: true
         99: false
     "};
-    let expected = "duplicate entry with key 99 at line 3 column 3 in .";
+    let expected =
+        "duplicate entry with key 99 at line 3 column 3 in .";
     test_error::<Value>(yaml, expected);
 
     let yaml = indoc! {"
@@ -486,6 +498,7 @@ fn test_duplicate_keys() {
         {}: true
         {}: false
     "};
-    let expected = "duplicate entry in YAML map at line 3 column 3 in .";
+    let expected =
+        "duplicate entry in YAML map at line 3 column 3 in .";
     test_error::<Value>(yaml, expected);
 }
