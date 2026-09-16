@@ -547,3 +547,16 @@ fn test_map_deserializer_out_of_order_calls_do_not_panic() {
     // Test borrowed &Value visit_map (exercises MapRefDeserializer)
     let _ = Deserializer::deserialize_any(&val, PrematureValueVisitor);
 }
+
+#[test]
+fn test_serialize_value_without_key_returns_error() {
+    use serde::ser::{SerializeMap, Serializer};
+
+    let serializer = serde_yml::value::Serializer;
+    let mut map_serializer = serializer.serialize_map(None).unwrap();
+    let result = map_serializer.serialize_value(&42);
+    assert!(
+        result.is_err(),
+        "Expected error when serialize_value called before serialize_key"
+    );
+}

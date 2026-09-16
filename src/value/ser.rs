@@ -430,12 +430,14 @@ impl ser::SerializeMap for SerializeMap {
             }
         };
         match key.take() {
-            Some(key) => mapping.insert(key, to_value(value)?),
-            None => {
-                panic!("serialize_value called before serialize_key")
+            Some(key) => {
+                mapping.insert(key, to_value(value)?);
+                Ok(())
             }
-        };
-        Ok(())
+            None => Err(ser::Error::custom(
+                "serialize_value called before serialize_key",
+            )),
+        }
     }
 
     fn serialize_entry<K, V>(
